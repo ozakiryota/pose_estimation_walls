@@ -180,6 +180,7 @@ double PCFittingWalls::ComputeSquareError(Eigen::Vector4f plane_parameters, std:
 void PCFittingWalls::PointCluster(void)
 {
 	std::cout << "POINT CLUSTER" << std::endl;
+	pcl::KdTreeFLANN<pcl::PointXYZ> kdtree_;
 	const int k = 2;
 	*gaussian_sphere_clustered = *gaussian_sphere;
 	std::vector<int> list_num_belongings(gaussian_sphere_clustered->points.size(), 1);
@@ -194,9 +195,9 @@ void PCFittingWalls::PointCluster(void)
 		for(size_t i=0;i<gaussian_sphere_clustered->points.size();i++){
 			std::vector<int> pointIdxNKNSearch(k);
 			std::vector<float> pointNKNSquaredDistance(k);
-			kdtree.setInputCloud(gaussian_sphere_clustered);
+			kdtree_.setInputCloud(gaussian_sphere_clustered);
 		std::cout << "test1" << std::endl;
-			if(kdtree.nearestKSearch(gaussian_sphere_clustered->points[i], k, pointIdxNKNSearch, pointNKNSquaredDistance)<=0)	std::cout << "kdtree error" << std::endl;
+			if(kdtree_.nearestKSearch(gaussian_sphere_clustered->points[i], k, pointIdxNKNSearch, pointNKNSquaredDistance)<=0)	std::cout << "kdtree_ error" << std::endl;
 		std::cout << "test2" << std::endl;
 			if(i==0){
 				shortest_distance = pointNKNSquaredDistance[1];
