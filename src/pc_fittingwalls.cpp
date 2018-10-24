@@ -195,7 +195,9 @@ void PCFittingWalls::PointCluster(void)
 			std::vector<int> pointIdxNKNSearch(k);
 			std::vector<float> pointNKNSquaredDistance(k);
 			kdtree.setInputCloud(gaussian_sphere_clustered);
+		std::cout << "test1" << std::endl;
 			if(kdtree.nearestKSearch(gaussian_sphere_clustered->points[i], k, pointIdxNKNSearch, pointNKNSquaredDistance)<=0)	std::cout << "kdtree error" << std::endl;
+		std::cout << "test2" << std::endl;
 			if(i==0){
 				shortest_distance = pointNKNSquaredDistance[1];
 				merge_pair_indices[0] = i;
