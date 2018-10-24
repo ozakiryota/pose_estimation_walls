@@ -17,6 +17,7 @@ class PCFittingWalls{
 		pcl::PointCloud<pcl::PointNormal>::Ptr normals {new pcl::PointCloud<pcl::PointNormal>};
 		pcl::PointCloud<pcl::PointNormal>::Ptr extracted_normals {new pcl::PointCloud<pcl::PointNormal>};
 		pcl::PointCloud<pcl::PointXYZ>::Ptr gaussian_sphere {new pcl::PointCloud<pcl::PointXYZ>};
+		pcl::PointCloud<pcl::PointXYZ>::Ptr gaussian_sphere_clustered {new pcl::PointCloud<pcl::PointXYZ>};
 		pcl::PointCloud<pcl::PointNormal>::Ptr g_vector {new pcl::PointCloud<pcl::PointNormal>};
 		/*kdtree*/
 		pcl::KdTreeFLANN<pcl::PointXYZ> kdtree;
@@ -31,6 +32,7 @@ class PCFittingWalls{
 		double AngleBetweenVectors(pcl::PointNormal v1, pcl::PointNormal v2);
 		double ComputeSquareError(Eigen::Vector4f plane_parameters, std::vector<int> indices);
 		void PointCluster(void);
+		void PointMerge(int index1, int index2, std::vector<int> list_num_belongings);
 		void Visualizer(void);
 };
 
@@ -108,7 +110,7 @@ void PCFittingWalls::NormalEstimation(void)
 			continue;
 		}
 		/*judge*/
-		// const double threshold_curvature = 0.0;
+		// const double threshold_curvature = 1.0e-1;
 		// if(curvature>threshold_curvature){
 		// 	std::cout << ">> curvature = " << curvature << " > " << threshold_curvature << ", then skip" << std::endl;
 		// 	continue;
@@ -119,7 +121,7 @@ void PCFittingWalls::NormalEstimation(void)
 			std::cout << ">> angle from square angle = " << fabs(AngleBetweenVectors(tmp_normal, g_vector->points[0])-M_PI/2.0) << " > " << threshold_angle << ", then skip" << std::endl;
 			continue;
 		}
-		const double threshold_square_error = 0.001;
+		const double threshold_square_error = 0.0001;
 		if(ComputeSquareError(plane_parameters, indices)>threshold_square_error){
 			std::cout << ">> square error = " << ComputeSquareError(plane_parameters, indices) << " > " << threshold_square_error << ", then skip" << std::endl;
 			continue;
@@ -156,6 +158,7 @@ double PCFittingWalls::AngleBetweenVectors(pcl::PointNormal v1, pcl::PointNormal
 
 double PCFittingWalls::ComputeSquareError(Eigen::Vector4f plane_parameters, std::vector<int> indices)
 {
+	std::cout << "COMPUTE SQUARE ERROR" << std::endl;
 	double sum_square_error = 0.0;
 	for(size_t i=0;i<indices.size();i++){
 		double square_error =	(plane_parameters[0]*cloud->points[indices[i]].x
@@ -176,6 +179,54 @@ double PCFittingWalls::ComputeSquareError(Eigen::Vector4f plane_parameters, std:
 
 void PCFittingWalls::PointCluster(void)
 {
+	std::cout << "POINT CLUSTER" << std::endl;
+	const int k = 2;
+	*gaussian_sphere_clustered = *gaussian_sphere;
+	std::vector<int> list_num_belongings(gaussian_sphere_clustered->points.size(), 1);
+	while(ros::ok()){
+		if(gaussian_sphere_clustered->points.size()<k){
+			std::cout << ">> finished merging" << std::endl;
+			break;
+		}
+
+		double shortest_distance;
+		int merge_pair_indices[2];
+		for(size_t i=0;i<gaussian_sphere_clustered->points.size();i++){
+			std::vector<int> pointIdxNKNSearch(k);
+			std::vector<float> pointNKNSquaredDistance(k);
+			kdtree.setInputCloud(gaussian_sphere_clustered);
+		std::cout << "test1" << std::endl;
+			if(kdtree.nearestKSearch(gaussian_sphere_clustered->points[i], k, pointIdxNKNSearch, pointNKNSquaredDistance)<=0)	std::cout << "kdtree error" << std::endl;
+		std::cout << "test2" << std::endl;
+			if(i==0){
+				shortest_distance = pointNKNSquaredDistance[1];
+				merge_pair_indices[0] = i;
+				merge_pair_indices[1] = pointIdxNKNSearch[1];
+			}
+			else if(pointNKNSquaredDistance[1]<shortest_distance){
+				shortest_distance = pointNKNSquaredDistance[1];
+				merge_pair_indices[0] = i;
+				merge_pair_indices[1] = pointIdxNKNSearch[1];
+			}
+		}
+		const double threshold_merge_distance = 0.1;
+		if(shortest_distance>threshold_merge_distance){
+			std::cout << ">> finished merging" << std::endl;
+			break;
+		}
+		else{
+			list_num_belongings[merge_pair_indices[0]] += list_num_belongings[merge_pair_indices[1]];
+			PointMerge(merge_pair_indices[0], merge_pair_indices[1], list_num_belongings);
+			/*erase*/
+			gaussian_sphere_clustered->points.erase(gaussian_sphere_clustered->points.begin() + merge_pair_indices[1]);
+			list_num_belongings.erase(list_num_belongings.begin() + merge_pair_indices[1]);
+		}
+	}
+}
+
+void PCFittingWalls::PointMerge(int index1, int index2, std::vector<int> list_num_belongings)
+{
+	std::cout << "POINT MERGE" << std::endl;
 }
 
 void PCFittingWalls::Visualizer(void)
