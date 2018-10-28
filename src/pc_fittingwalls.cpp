@@ -205,7 +205,10 @@ void PCFittingWalls::PointCluster(void)
 	*gaussian_sphere_clustered = *gaussian_sphere;
 	std::vector<int> list_num_belongings(gaussian_sphere_clustered->points.size(), 1);
 	
-	if(true)	PointPreCluster(list_num_belongings);
+	std::cout << "gaussian_sphere_clustered->points.size() = " << gaussian_sphere_clustered->points.size() << std::endl;
+	const int threshold_num_points_before_cluster = 250;
+	if(gaussian_sphere_clustered->points.size()>threshold_num_points_before_cluster)	PointPreCluster(list_num_belongings);
+	if(gaussian_sphere_clustered->points.size()>threshold_num_points_before_cluster)	PointPreCluster(list_num_belongings);
 	
 	while(ros::ok()){
 		if(gaussian_sphere_clustered->points.size()<k){
@@ -278,41 +281,34 @@ void PCFittingWalls::PointPreCluster(std::vector<int>& list_num_belongings)
 	std::cout << "POINT PRE CLUSTER" << std::endl;
 	const int k = 2;
 	kdtree.setInputCloud(gaussian_sphere_clustered);
-	const double threshold_merge_distance = 0.01;
-	std::vector<std::vector<int>> list_merged_pair_indices;
+	const double threshold_merge_distance = 0.005;
+	std::vector<bool> list_point_need_to_be_erased(gaussian_sphere_clustered->points.size(), false);
+	std::vector<bool> list_point_is_merged(gaussian_sphere_clustered->points.size(), false);
 	for(size_t i=0;i<gaussian_sphere_clustered->points.size();i++){
+		if(list_point_is_merged[i]) continue;
 		std::vector<int> pointIdxNKNSearch(k);
 		std::vector<float> pointNKNSquaredDistance(k);
 		if(kdtree.nearestKSearch(gaussian_sphere_clustered->points[i], k, pointIdxNKNSearch, pointNKNSquaredDistance)<=0)	std::cout << "kdtree error" << std::endl;
-		std::vector<int> merge_pair_indices(2);
-		merge_pair_indices[0] = i;
-		merge_pair_indices[1] = pointIdxNKNSearch[1];
-		if(pointNKNSquaredDistance[1]<threshold_merge_distance){
-			bool point_is_merged = false;
-			for(size_t j=0;j<list_merged_pair_indices.size();j++){
-				for(size_t k=0;k<merge_pair_indices.size();k++){
-					if(list_merged_pair_indices[j][k]==merge_pair_indices[0] || list_merged_pair_indices[j][k]==merge_pair_indices[1]){
-						point_is_merged = true;
-						break;
-					}
-				}
-				if(point_is_merged)	break;
-			}
-			if(!point_is_merged){
-				/*merge*/
-				gaussian_sphere_clustered->points[merge_pair_indices[0]] = PointMerge(merge_pair_indices[0], merge_pair_indices[1], list_num_belongings);
-				list_num_belongings[merge_pair_indices[0]] += list_num_belongings[merge_pair_indices[1]];
-				list_merged_pair_indices.push_back(merge_pair_indices);
-			}
+		if(!list_point_is_merged[pointIdxNKNSearch[1]] && pointNKNSquaredDistance[1]<threshold_merge_distance){
+			/*merge*/
+			gaussian_sphere_clustered->points[i] = PointMerge(i, pointIdxNKNSearch[1], list_num_belongings);
+			list_num_belongings[i] += list_num_belongings[pointIdxNKNSearch[1]];
+			list_point_is_merged[i] = true;
+			list_point_is_merged[pointIdxNKNSearch[1]] = true;
+			/*prepare for erasing*/
+			list_point_need_to_be_erased[pointIdxNKNSearch[1]] = true;
 		}
 	}
 	/*erase*/
-	std::cout << "---list_merged_pair_indices.size() = " << list_merged_pair_indices.size() << std::endl;
-	for(size_t i=0;i<list_merged_pair_indices.size();i++){
-		gaussian_sphere_clustered->points.erase(gaussian_sphere_clustered->points.begin() + list_merged_pair_indices[i][1]);
-		list_num_belongings.erase(list_num_belongings.begin() + list_merged_pair_indices[i][1]);
-		std::cout << "list_merged_pair_indices.size() = " << list_merged_pair_indices.size() << std::endl;
+	int count_erase = 0;
+	for(size_t i=0;i<list_point_need_to_be_erased.size();i++){
+		if(list_point_need_to_be_erased[i]){
+			gaussian_sphere_clustered->points.erase(gaussian_sphere_clustered->points.begin() + i - count_erase);
+			list_num_belongings.erase(list_num_belongings.begin() + i - count_erase);
+			count_erase ++;
+		}
 	}
+	std::cout << "count_erase" << count_erase << std::endl;
 }
 
 pcl::PointXYZ PCFittingWalls::PointMerge(int index1, int index2, std::vector<int> list_num_belongings)
