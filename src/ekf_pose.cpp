@@ -212,6 +212,8 @@ void EKFPose::ObservationSLAM(void)
 		std::cout << "K*Y = " << std::endl << K*Y << std::endl;
 		std::cout << "P = " << std::endl << P << std::endl;
 	}
+	
+	q_pose = tf::createQuaternionFromRPY(X(0, 0), X(1, 0), X(2, 0));
 }
 
 void EKFPose::CallbackWalls(const sensor_msgs::PointCloud2ConstPtr& msg)
