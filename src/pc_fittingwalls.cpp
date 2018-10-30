@@ -9,7 +9,10 @@
 class PCFittingWalls{
 	private:
 		ros::NodeHandle nh;
+		/*subscribe*/
 		ros::Subscriber sub;
+		/*publish*/
+		ros::Publisher pub;
 		/*viewer*/
 		pcl::visualization::PCLVisualizer viewer{"pc_normals"};
 		/*cloud*/
@@ -24,6 +27,8 @@ class PCFittingWalls{
 		pcl::PointCloud<pcl::PointNormal>::Ptr g_vector {new pcl::PointCloud<pcl::PointNormal>};
 		/*kdtree*/
 		pcl::KdTreeFLANN<pcl::PointXYZ> kdtree;
+		/*flags*/
+		bool g_estimation_success;
 
 	public:
 		PCFittingWalls();
@@ -40,11 +45,13 @@ class PCFittingWalls{
 		bool GVectorEstimation(void);
 		void PartialRotation(void);
 		void Visualizer(void);
+		void Publisher(void);
 };
 
 PCFittingWalls::PCFittingWalls()
 {
 	sub = nh.subscribe("/velodyne_points", 1, &PCFittingWalls::Callback, this);
+	pub = nh.advertise<sensor_msgs::PointCloud2>("/g_and_walls", 1);
 	viewer.setBackgroundColor(1, 1, 1);
 	viewer.addCoordinateSystem(0.5, "axis");
 	g_vector_from_ekf->points.resize(1);
@@ -63,8 +70,9 @@ void PCFittingWalls::Callback(const sensor_msgs::PointCloud2ConstPtr &msg)
 	ClearCloud();
 	NormalEstimation();
 	PointCluster();
-	bool estimation_success = GVectorEstimation();
+	g_estimation_success = GVectorEstimation();
 	Visualizer();
+	Publisher();
 }
 
 void PCFittingWalls::GetGVector(void)
@@ -91,7 +99,7 @@ void PCFittingWalls::NormalEstimation(void)
 	std::cout << "NORMAL ESTIMATION" << std::endl;
 	kdtree.setInputCloud(cloud);
 
-	const size_t skip_step = 10;
+	const size_t skip_step = 5;
 	for(size_t i=0;i<cloud->points.size();i+=skip_step){
 		/*search neighbor points*/
 		std::vector<int> indices;
@@ -413,17 +421,28 @@ void PCFittingWalls::Visualizer(void)
 	viewer.setPointCloudRenderingProperties (pcl::visualization::PCL_VISUALIZER_COLOR, 1.0, 0.8, 0.0, "gaussian_sphere_clustered_n");
 	viewer.setPointCloudRenderingProperties (pcl::visualization::PCL_VISUALIZER_LINE_WIDTH, 3, "gaussian_sphere_clustered_n");
 	
-	viewer.removePointCloud("gaussian_sphere_clustered_weighted");
-	viewer.addPointCloud(gaussian_sphere_clustered_weighted, "gaussian_sphere_clustered_weighted");
-	viewer.setPointCloudRenderingProperties (pcl::visualization::PCL_VISUALIZER_COLOR, 1.0, 0.5, 0.0, "gaussian_sphere_clustered_weighted");
-	viewer.setPointCloudRenderingProperties (pcl::visualization::PCL_VISUALIZER_POINT_SIZE, 3, "gaussian_sphere_clustered_weighted");
-	
 	viewer.removePointCloud("g_vector");
 	viewer.addPointCloudNormals<pcl::PointNormal>(g_vector, 1, 1.0, "g_vector");
 	viewer.setPointCloudRenderingProperties (pcl::visualization::PCL_VISUALIZER_COLOR, 0.0, 1.0, 0.0, "g_vector");
 	viewer.setPointCloudRenderingProperties (pcl::visualization::PCL_VISUALIZER_LINE_WIDTH, 3, "g_vector");
 
 	viewer.spinOnce();
+}
+
+void PCFittingWalls::Publisher()
+{
+	std::cout << "PUBLISHER" << std::endl;
+	if(g_estimation_success){
+		pcl::PointCloud<pcl::PointNormal>::Ptr g_and_walls (new pcl::PointCloud<pcl::PointNormal>);
+		g_and_walls->header = cloud->header;
+		g_and_walls->points.push_back(g_vector->points[0]);
+		for(size_t i=0;i<gaussian_sphere_clustered_n->points.size();i++){
+			g_and_walls->points.push_back(gaussian_sphere_clustered_n->points[i]);	//points[0]:gravity, points[1~]:wall_normals
+		}
+		sensor_msgs::PointCloud2 ros_g_and_normals;
+		pcl::toROSMsg(*g_and_walls, ros_g_and_normals);
+		pub.publish(ros_g_and_normals);
+	}
 }
 
 int main(int argc, char** argv)

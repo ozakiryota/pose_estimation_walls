@@ -202,3 +202,7 @@ include_directories(
 # catkin_add_nosetests(test)
 add_executable(pc_fittingwalls src/pc_fittingwalls.cpp)
 target_link_libraries(pc_fittingwalls ${catkin_LIBRARIES})
+add_executable(ekf_pose src/ekf_pose.cpp)
+target_link_libraries(ekf_pose ${catkin_LIBRARIES})
+add_executable(imu_initial_alignment src/imu_initial_alignment.cpp)
+target_link_libraries(imu_initial_alignment ${catkin_LIBRARIES})
