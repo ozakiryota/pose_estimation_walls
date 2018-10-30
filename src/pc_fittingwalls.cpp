@@ -18,6 +18,7 @@ class PCFittingWalls{
 		pcl::PointCloud<pcl::PointNormal>::Ptr extracted_normals {new pcl::PointCloud<pcl::PointNormal>};
 		pcl::PointCloud<pcl::PointXYZ>::Ptr gaussian_sphere {new pcl::PointCloud<pcl::PointXYZ>};
 		pcl::PointCloud<pcl::PointXYZ>::Ptr gaussian_sphere_clustered {new pcl::PointCloud<pcl::PointXYZ>};
+		pcl::PointCloud<pcl::PointXYZ>::Ptr gaussian_sphere_clustered_weighted {new pcl::PointCloud<pcl::PointXYZ>};
 		pcl::PointCloud<pcl::PointNormal>::Ptr gaussian_sphere_clustered_n {new pcl::PointCloud<pcl::PointNormal>};	//just for the viewer
 		pcl::PointCloud<pcl::PointNormal>::Ptr g_vector_from_ekf {new pcl::PointCloud<pcl::PointNormal>};
 		pcl::PointCloud<pcl::PointNormal>::Ptr g_vector {new pcl::PointCloud<pcl::PointNormal>};
@@ -81,6 +82,7 @@ void PCFittingWalls::ClearCloud(void)
 {
 	extracted_normals->points.clear();
 	gaussian_sphere->points.clear();
+	gaussian_sphere_clustered_weighted->points.clear();
 	gaussian_sphere_clustered_n->points.clear();
 }
 
@@ -205,10 +207,14 @@ void PCFittingWalls::PointCluster(void)
 	*gaussian_sphere_clustered = *gaussian_sphere;
 	std::vector<int> list_num_belongings(gaussian_sphere_clustered->points.size(), 1);
 	
+	/*pre cluster*/
 	std::cout << "gaussian_sphere_clustered->points.size() = " << gaussian_sphere_clustered->points.size() << std::endl;
 	const int threshold_num_points_before_cluster = 250;
-	if(gaussian_sphere_clustered->points.size()>threshold_num_points_before_cluster)	PointPreCluster(list_num_belongings);
-	if(gaussian_sphere_clustered->points.size()>threshold_num_points_before_cluster)	PointPreCluster(list_num_belongings);
+	int num_times_precluster = gaussian_sphere_clustered->points.size()/threshold_num_points_before_cluster;
+	for(int i=0;i<num_times_precluster;i++){
+		if(gaussian_sphere_clustered->points.size()>threshold_num_points_before_cluster)	PointPreCluster(list_num_belongings);
+		else	break;
+	}
 	
 	while(ros::ok()){
 		if(gaussian_sphere_clustered->points.size()<k){
@@ -273,6 +279,14 @@ void PCFittingWalls::PointCluster(void)
 			tmp_normal.normal_z = gaussian_sphere_clustered->points[i].z;
 			gaussian_sphere_clustered_n->points.push_back(tmp_normal);
 		}
+	}
+	/*give weight*/
+	for(size_t i=0;i<gaussian_sphere_clustered->points.size();i++){
+		pcl::PointXYZ tmp_point;
+		tmp_point.x = list_num_belongings[i]*gaussian_sphere_clustered->points[i].x;
+		tmp_point.y = list_num_belongings[i]*gaussian_sphere_clustered->points[i].y;
+		tmp_point.z = list_num_belongings[i]*gaussian_sphere_clustered->points[i].z;
+		gaussian_sphere_clustered_weighted->points.push_back(tmp_point);
 	}
 }
 
@@ -343,7 +357,7 @@ bool PCFittingWalls::GVectorEstimation(void)
 		std::cout << ">> more than 3 normals" << std::endl;
 		Eigen::Vector4f plane_parameters;
 		float curvature;
-		pcl::computePointNormal(*gaussian_sphere_clustered, plane_parameters, curvature);
+		pcl::computePointNormal(*gaussian_sphere_clustered_weighted, plane_parameters, curvature);
 		g_vector->points[0].normal_x = plane_parameters[0];
 		g_vector->points[0].normal_y = plane_parameters[1];
 		g_vector->points[0].normal_z = plane_parameters[2];
