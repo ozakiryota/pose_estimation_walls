@@ -229,6 +229,58 @@ void EKFPose::CallbackWalls(const sensor_msgs::PointCloud2ConstPtr& msg)
 
 void EKFPose::ObservationWalls(pcl::PointNormal g_vector, pcl::PointCloud<pcl::PointNormal>::Ptr normals)
 {
+	const int num_obs = 3;
+		
+	count_usingwalls++;
+	std::cout << count_usingwalls << ": CALLBACK USINGWALLS" << std::endl;
+	
+	const double g = -9.80665;
+	double gx = g_vector.normal_x*g; 
+	double gy = g_vector.normal_y*g; 
+	double gz = g_vector.normal_z*g; 
+
+	Eigen::MatrixXd Z(num_obs, 1);
+	Z <<	atan2(gy, gz),
+	  		atan2(-gx, sqrt(gy*gy + gz*gz)),
+			X(2, 0);
+	Eigen::MatrixXd H(num_obs, num_state);
+	H <<	1,	0,	0,
+			0,	1,	0,
+			0, 	0,	1;
+	Eigen::MatrixXd jH(num_obs, num_state);
+	jH <<	1,	0,	0,
+			0,	1,	0,
+			0,	0,	1;
+	Eigen::MatrixXd R(num_obs, num_obs);
+	const double sigma = 1.0e+1;
+	R = sigma*Eigen::MatrixXd::Identity(num_obs, num_obs);
+	Eigen::MatrixXd Y(num_obs, 1);
+	Eigen::MatrixXd S(num_obs, num_obs);
+	Eigen::MatrixXd K(num_state, num_obs);
+	Eigen::MatrixXd I = Eigen::MatrixXd::Identity(num_state, num_state);
+
+	Y = Z - H*X;
+	for(int i=0;i<3;i++){
+		if(Y(i, 0)>M_PI)	Y(i, 0) -= 2.0*M_PI;
+		if(Y(i, 0)<-M_PI)	Y(i, 0) += 2.0*M_PI;
+	}
+	S = jH*P*jH.transpose() + R;
+	K = P*jH.transpose()*S.inverse();
+	K(2, 0) = 0.0;	//temporary repair
+	K(2, 1) = 0.0;	//temporary repair
+	K(2, 2) = 0.0;	//temporary repair
+	X = X + K*Y;
+	P = (I - K*jH)*P;
+		
+	for(int i=0;i<3;i++){
+		if(X(i, 0)>M_PI)	X(i, 0) -= 2.0*M_PI;
+		if(X(i, 0)<-M_PI)	X(i, 0) += 2.0*M_PI;
+	}
+
+	std::cout << "Y = " << std::endl << Y << std::endl;
+	std::cout << "K*Y = " << std::endl << K*Y << std::endl;
+	
+	q_pose = tf::createQuaternionFromRPY(X(0, 0), X(1, 0), X(2, 0));
 }
 
 int main(int argc, char** argv)
