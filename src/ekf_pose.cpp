@@ -78,7 +78,7 @@ void EKFPose::CallbackImu(const sensor_msgs::ImuConstPtr& msg)
 {
 	time_imu_now = ros::Time::now();
 	double dt = (time_imu_now - time_imu_last).toSec();
-	time_imu_last = time_now;
+	time_imu_last = time_imu_now;
 	if(first_callback_imu)	dt = 0.0;
 	else if(inipose_is_available)	PredictionImu(*msg, dt);
 	first_callback_imu = false;
