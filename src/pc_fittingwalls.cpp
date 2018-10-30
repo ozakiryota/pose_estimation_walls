@@ -413,6 +413,11 @@ void PCFittingWalls::Visualizer(void)
 	viewer.setPointCloudRenderingProperties (pcl::visualization::PCL_VISUALIZER_COLOR, 1.0, 0.8, 0.0, "gaussian_sphere_clustered_n");
 	viewer.setPointCloudRenderingProperties (pcl::visualization::PCL_VISUALIZER_LINE_WIDTH, 3, "gaussian_sphere_clustered_n");
 	
+	viewer.removePointCloud("gaussian_sphere_clustered_weighted");
+	viewer.addPointCloud(gaussian_sphere_clustered_weighted, "gaussian_sphere_clustered_weighted");
+	viewer.setPointCloudRenderingProperties (pcl::visualization::PCL_VISUALIZER_COLOR, 1.0, 0.5, 0.0, "gaussian_sphere_clustered_weighted");
+	viewer.setPointCloudRenderingProperties (pcl::visualization::PCL_VISUALIZER_POINT_SIZE, 3, "gaussian_sphere_clustered_weighted");
+	
 	viewer.removePointCloud("g_vector");
 	viewer.addPointCloudNormals<pcl::PointNormal>(g_vector, 1, 1.0, "g_vector");
 	viewer.setPointCloudRenderingProperties (pcl::visualization::PCL_VISUALIZER_COLOR, 0.0, 1.0, 0.0, "g_vector");
