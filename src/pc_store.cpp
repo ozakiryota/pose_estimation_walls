@@ -76,7 +76,7 @@ void PCStore::Visualizer(void)
 	viewer.removePointCloud("cloud");
 	viewer.addPointCloud(cloud, "cloud");
 	viewer.setPointCloudRenderingProperties (pcl::visualization::PCL_VISUALIZER_COLOR, 0.0, 0.0, 0.0, "cloud");
-	viewer.setPointCloudRenderingProperties (pcl::visualization::PCL_VISUALIZER_POINT_SIZE, 3, "cloud");
+	viewer.setPointCloudRenderingProperties (pcl::visualization::PCL_VISUALIZER_POINT_SIZE, 1, "cloud");
 	
 	viewer.spinOnce();
 }
