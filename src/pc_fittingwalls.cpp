@@ -121,7 +121,7 @@ void PCFittingWalls::NormalEstimation(void)
 	std::cout << "NORMAL ESTIMATION" << std::endl;
 	kdtree.setInputCloud(cloud);
 
-	const size_t skip_step = 5;
+	const size_t skip_step = 6;
 	for(size_t i=0;i<cloud->points.size();i+=skip_step){
 		/*search neighbor points*/
 		std::vector<int> indices;

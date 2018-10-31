@@ -12,7 +12,10 @@
 	<node pkg="pose_estimation_walls" name="pc_fittingwalls" type="pc_fittingwalls"/>
 	<node pkg="pose_estimation_walls" name="ekf_pose" type="ekf_pose" output="screen"/>
 	<node pkg="pose_estimation_walls" name="combine_linearvelocity_and_pose" type="combine_linearvelocity_and_pose"/>
+	<!-- <node pkg="pose_estimation_walls" name="yaw_estimation_walls" type="yaw_estimation_walls"/> -->
 	<!-- loam velodyne	 -->
 	<include file="$(find loam_velodyne)/launch/hector_loam_velodyne.launch"/>
 	<node pkg="pose_estimation_walls" name="odom_creater_for_loamvelodyne" type="odom_creater_for_loamvelodyne"/>
+	<!-- graph -->
+	<!-- <node pkg="pose_estimation_walls" name="graph_rpy" type="graph_rpy.py"/> -->
 </launch>
