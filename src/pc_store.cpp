@@ -17,7 +17,8 @@ class PCStore{
 		/*viewer*/
 		pcl::visualization::PCLVisualizer viewer{"pc_store"};
 		/*cloud*/
-		pcl::PointCloud<pcl::PointXYZ>::Ptr cloud {new pcl::PointCloud<pcl::PointXYZ>};
+		pcl::PointCloud<pcl::PointXYZ>::Ptr cloud_stored {new pcl::PointCloud<pcl::PointXYZ>};
+		pcl::PointCloud<pcl::PointXYZ>::Ptr cloud_now {new pcl::PointCloud<pcl::PointXYZ>};
 		/*odom*/
 		nav_msgs::Odometry odom_now;
 		nav_msgs::Odometry odom_last;
@@ -41,7 +42,33 @@ PCStore::PCStore()
 
 void PCStore::CallbackPC(const sensor_msgs::PointCloud2ConstPtr &msg)
 {
-	if(!first_callback_odom){
+	// if(!first_callback_odom){
+	// 	tf::Quaternion pose_now;
+	// 	tf::Quaternion pose_last;
+	// 	quaternionMsgToTF(odom_now.pose.pose.orientation, pose_now);
+	// 	quaternionMsgToTF(odom_last.pose.pose.orientation, pose_last);
+	// 	tf::Quaternion relative_rotation = pose_last*pose_now.inverse();
+	// 	Eigen::Quaternionf rotation(relative_rotation.w(), relative_rotation.x(), relative_rotation.y(), relative_rotation.z());
+	// 	Eigen::Vector3f offset(
+	// 			odom_last.pose.pose.position.x - odom_now.pose.pose.position.x,
+	// 			odom_last.pose.pose.position.y - odom_now.pose.pose.position.y,
+	// 			odom_last.pose.pose.position.z - odom_now.pose.pose.position.z);
+	// 	pcl::transformPointCloud(*cloud, *cloud, offset, rotation);
+    //
+	// 	pcl::PointCloud<pcl::PointXYZ>::Ptr tmp_cloud (new pcl::PointCloud<pcl::PointXYZ>);
+	// 	pcl::fromROSMsg(*msg, *tmp_cloud);
+	// 	*cloud += *tmp_cloud;
+    //
+	// 	odom_last = odom_now;
+	// }
+	pcl::fromROSMsg(*msg, *cloud_now);
+}
+
+void PCStore::CallbackOdom(const nav_msgs::OdometryConstPtr& msg)
+{
+	odom_now = *msg;
+	if(first_callback_odom)	odom_last = odom_now;
+	else{
 		tf::Quaternion pose_now;
 		tf::Quaternion pose_last;
 		quaternionMsgToTF(odom_now.pose.pose.orientation, pose_now);
@@ -52,21 +79,11 @@ void PCStore::CallbackPC(const sensor_msgs::PointCloud2ConstPtr &msg)
 				odom_last.pose.pose.position.x - odom_now.pose.pose.position.x,
 				odom_last.pose.pose.position.y - odom_now.pose.pose.position.y,
 				odom_last.pose.pose.position.z - odom_now.pose.pose.position.z);
-		pcl::transformPointCloud(*cloud, *cloud, offset, rotation);
-
-		pcl::PointCloud<pcl::PointXYZ>::Ptr tmp_cloud (new pcl::PointCloud<pcl::PointXYZ>);
-		pcl::fromROSMsg(*msg, *tmp_cloud);
-		*cloud += *tmp_cloud;
-
+		pcl::transformPointCloud(*cloud_stored, *cloud_stored, offset, rotation);
+		*cloud_stored  += *cloud_now;
+			
 		odom_last = odom_now;
 	}
-}
-
-void PCStore::CallbackOdom(const nav_msgs::OdometryConstPtr& msg)
-{
-	odom_now = *msg;
-	if(first_callback_odom)	odom_last = odom_now;
-	
 	Visualizer();
 
 	first_callback_odom = false;
@@ -74,7 +91,7 @@ void PCStore::CallbackOdom(const nav_msgs::OdometryConstPtr& msg)
 void PCStore::Visualizer(void)
 {
 	viewer.removePointCloud("cloud");
-	viewer.addPointCloud(cloud, "cloud");
+	viewer.addPointCloud(cloud_stored, "cloud");
 	viewer.setPointCloudRenderingProperties (pcl::visualization::PCL_VISUALIZER_COLOR, 0.0, 0.0, 0.0, "cloud");
 	viewer.setPointCloudRenderingProperties (pcl::visualization::PCL_VISUALIZER_POINT_SIZE, 1, "cloud");
 	
