@@ -66,7 +66,7 @@ void PCFittingWalls::Callback(const sensor_msgs::PointCloud2ConstPtr &msg)
 	std::cout << "CALLBACK" << std::endl;
 	GetGVector();
 	pcl::fromROSMsg(*msg, *cloud);
-	pcl::fromROSMsg(*msg, *normals);
+	// pcl::fromROSMsg(*msg, *normals);
 	ClearCloud();
 	NormalEstimation();
 	PointCluster();
@@ -88,6 +88,7 @@ void PCFittingWalls::GetGVector(void)
 
 void PCFittingWalls::ClearCloud(void)
 {
+	normals->points.clear();
 	extracted_normals->points.clear();
 	gaussian_sphere->points.clear();
 	gaussian_sphere_clustered_weighted->points.clear();
@@ -113,11 +114,6 @@ void PCFittingWalls::NormalEstimation(void)
 		indices = KdtreeSearch(cloud->points[i], search_radius);
 		/*compute normal*/
 		pcl::computePointNormal(*cloud, indices, plane_parameters, curvature);
-		
-		normals->points[i].normal_x = plane_parameters[0]; 
-		normals->points[i].normal_y = plane_parameters[1]; 
-		normals->points[i].normal_z = plane_parameters[2]; 
-		flipNormalTowardsViewpoint(normals->points[i], 0.0, 0.0, 0.0, normals->points[i].normal_x, normals->points[i].normal_y, normals->points[i].normal_z);
 
 		pcl::PointNormal tmp_normal;
 		tmp_normal.x = cloud->points[i].x;
@@ -128,6 +124,8 @@ void PCFittingWalls::NormalEstimation(void)
 		tmp_normal.normal_z = plane_parameters[2];
 		tmp_normal.curvature = curvature;
 		flipNormalTowardsViewpoint(tmp_normal, 0.0, 0.0, 0.0, tmp_normal.normal_x, tmp_normal.normal_y, tmp_normal.normal_z);
+
+		normals->points.push_back(tmp_normal);
 		
 		/*judge*/		
 		const size_t num_neighborpoints = 50;

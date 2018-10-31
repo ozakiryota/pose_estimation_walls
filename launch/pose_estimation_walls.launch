@@ -8,6 +8,6 @@
 	<include file="$(find velodyne_pointcloud)/launch/32e_points.launch"/>
 
 	<node pkg="pose_estimation_walls" name="imu_initial_alignment" type="imu_initial_alignment" output="screen"/>
-	<node pkg="pose_estimation_walls" name="pc_fittingwalls" type="pc_fittingwalls" output="screen"/>
+	<node pkg="pose_estimation_walls" name="pc_fittingwalls" type="pc_fittingwalls"/>
 	<node pkg="pose_estimation_walls" name="ekf_pose" type="ekf_pose" output="screen"/>
 </launch>

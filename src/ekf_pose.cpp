@@ -17,6 +17,8 @@ class EKFPose{
 		ros::Subscriber sub_imu;
 		ros::Subscriber sub_slam;
 		ros::Subscriber sub_walls;
+		/*publish*/
+		ros::Publisher pub;
 		/*const*/
 		const int num_state = 3;
 		/*objects*/
@@ -47,6 +49,7 @@ class EKFPose{
 		void ObservationSLAM(void);
 		void CallbackWalls(const sensor_msgs::PointCloud2ConstPtr& msg);
 		void ObservationWalls(pcl::PointNormal g_vector, pcl::PointCloud<pcl::PointNormal>::Ptr normals);
+		void Publisher();
 };
 
 EKFPose::EKFPose()
@@ -56,6 +59,8 @@ EKFPose::EKFPose()
 	sub_imu = nh.subscribe("/imu/data", 1, &EKFPose::CallbackIMU, this);
 	sub_slam = nh.subscribe("/lsd_slam/pose", 1, &EKFPose::CallbackSLAM, this);
 	sub_walls = nh.subscribe("/g_and_walls", 1, &EKFPose::CallbackWalls, this);
+	pub = nh.advertise<geometry_msgs::PoseStamped>("/pose_ekf", 1);
+	q_pose = tf::Quaternion(0.0, 0.0, 0.0, 1.0);
 	X = Eigen::MatrixXd::Constant(num_state, 1, 0.0);
 	P = 1.0e-10*Eigen::MatrixXd::Identity(num_state, num_state);
 }
@@ -88,6 +93,9 @@ void EKFPose::CallbackIMU(const sensor_msgs::ImuConstPtr& msg)
 	time_imu_last = time_imu_now;
 	if(first_callback_imu)	dt = 0.0;
 	else if(inipose_is_available)	PredictionIMU(*msg, dt);
+	
+	Publisher();
+
 	first_callback_imu = false;
 }
 
@@ -153,6 +161,8 @@ void EKFPose::CallbackSLAM(const geometry_msgs::PoseStampedConstPtr& msg)
 	
 	q_slam_last = q_slam_now;
 	q_pose_last_at_slamcall = q_pose;
+	
+	Publisher();
 }
 
 void EKFPose::ObservationSLAM(void)
@@ -227,6 +237,8 @@ void EKFPose::CallbackWalls(const sensor_msgs::PointCloud2ConstPtr& msg)
 		else	normals->points.push_back(tmp_normals->points[i]);
 	}
 	if(inipose_is_available)	ObservationWalls(g_vector, normals);
+	
+	Publisher();
 }
 
 void EKFPose::ObservationWalls(pcl::PointNormal g_vector, pcl::PointCloud<pcl::PointNormal>::Ptr normals)
@@ -283,6 +295,16 @@ void EKFPose::ObservationWalls(pcl::PointNormal g_vector, pcl::PointCloud<pcl::P
 	std::cout << "K*Y = " << std::endl << K*Y << std::endl;
 	
 	q_pose = tf::createQuaternionFromRPY(X(0, 0), X(1, 0), X(2, 0));
+}
+
+void EKFPose::Publisher(void)
+{
+	geometry_msgs::PoseStamped pose_out;
+	q_pose.normalize();
+	quaternionTFToMsg(q_pose, pose_out.pose.orientation);
+	pose_out.header.frame_id = "/odom";
+	pose_out.header.stamp = ros::Time::now();
+	pub.publish(pose_out);
 }
 
 int main(int argc, char** argv)
