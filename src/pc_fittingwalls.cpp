@@ -1,5 +1,6 @@
 #include <ros/ros.h>
 #include <sensor_msgs/PointCloud2.h>
+#include <geometry_msgs/PoseStamped.h>
 #include <pcl/point_cloud.h>
 #include <pcl/point_types.h>
 #include <pcl/visualization/cloud_viewer.h>
@@ -10,7 +11,8 @@ class PCFittingWalls{
 	private:
 		ros::NodeHandle nh;
 		/*subscribe*/
-		ros::Subscriber sub;
+		ros::Subscriber sub_pc;
+		ros::Subscriber sub_pose;
 		/*publish*/
 		ros::Publisher pub;
 		/*viewer*/
@@ -32,8 +34,9 @@ class PCFittingWalls{
 
 	public:
 		PCFittingWalls();
-		void Callback(const sensor_msgs::PointCloud2ConstPtr& msg);
-		void GetGVector(void);
+		void CallbackPC(const sensor_msgs::PointCloud2ConstPtr& msg);
+		void CallbackPose(const geometry_msgs::PoseStampedConstPtr &msg);
+		Eigen::MatrixXd FrameRotation(geometry_msgs::Quaternion q, Eigen::MatrixXd X, bool from_global_to_local);
 		void ClearCloud(void);
 		void NormalEstimation(void);
 		std::vector<int> KdtreeSearch(pcl::PointXYZ searchpoint, double search_radius);
@@ -50,23 +53,25 @@ class PCFittingWalls{
 
 PCFittingWalls::PCFittingWalls()
 {
-	sub = nh.subscribe("/velodyne_points", 1, &PCFittingWalls::Callback, this);
+	sub_pc = nh.subscribe("/velodyne_points", 1, &PCFittingWalls::CallbackPC, this);
+	sub_pose = nh.subscribe("/pose_ekf", 1, &PCFittingWalls::CallbackPose, this);
 	pub = nh.advertise<sensor_msgs::PointCloud2>("/g_and_walls", 1);
 	viewer.setBackgroundColor(1, 1, 1);
 	viewer.addCoordinateSystem(0.5, "axis");
 	g_vector_from_ekf->points.resize(1);
+	g_vector_from_ekf->points[0].x = 0.0;
+	g_vector_from_ekf->points[0].y = 0.0;
+	g_vector_from_ekf->points[0].z = 0.0;
 	g_vector->points.resize(1);
 	g_vector->points[0].x = 0.0;
 	g_vector->points[0].y = 0.0;
 	g_vector->points[0].z = 0.0;
 }
 
-void PCFittingWalls::Callback(const sensor_msgs::PointCloud2ConstPtr &msg)
+void PCFittingWalls::CallbackPC(const sensor_msgs::PointCloud2ConstPtr &msg)
 {
-	std::cout << "CALLBACK" << std::endl;
-	GetGVector();
+	std::cout << "CALLBACK PC" << std::endl;
 	pcl::fromROSMsg(*msg, *cloud);
-	// pcl::fromROSMsg(*msg, *normals);
 	ClearCloud();
 	NormalEstimation();
 	PointCluster();
@@ -75,15 +80,31 @@ void PCFittingWalls::Callback(const sensor_msgs::PointCloud2ConstPtr &msg)
 	Publisher();
 }
 
-void PCFittingWalls::GetGVector(void)
+void PCFittingWalls::CallbackPose(const geometry_msgs::PoseStampedConstPtr &msg)
 {
-	/*test*/
-	g_vector_from_ekf->points[0].x = 0.0;
-	g_vector_from_ekf->points[0].y = 0.0;
-	g_vector_from_ekf->points[0].z = 0.0;
-	g_vector_from_ekf->points[0].normal_x = 0.0;
-	g_vector_from_ekf->points[0].normal_y = 0.0;
-	g_vector_from_ekf->points[0].normal_z = -1.0;
+	std::cout << "CALLBACK POSE" << std::endl;
+	Eigen::MatrixXd G_global(3, 1);
+	G_global <<	0.0,
+			 	0.0,
+				-1.0;
+	Eigen::MatrixXd G_local(3, 1);
+	G_local = FrameRotation(msg->pose.orientation, G_global, true);
+	
+	g_vector_from_ekf->points[0].normal_x = G_local(0, 0);
+	g_vector_from_ekf->points[0].normal_y = G_local(1, 0);
+	g_vector_from_ekf->points[0].normal_z = G_local(2, 0);
+}
+
+Eigen::MatrixXd PCFittingWalls::FrameRotation(geometry_msgs::Quaternion q, Eigen::MatrixXd X, bool from_global_to_local)
+{
+	if(!from_global_to_local)    q.w *= -1;
+	Eigen::MatrixXd Rot(3, 3); 
+	Rot <<	q.w*q.w + q.x*q.x - q.y*q.y - q.z*q.z,  2*(q.x*q.y + q.w*q.z),	2*(q.x*q.z - q.w*q.y),
+		2*(q.x*q.y - q.w*q.z),	q.w*q.w - q.x*q.x + q.y*q.y - q.z*q.z,	2*(q.y*q.z + q.w*q.x),
+		2*(q.x*q.z + q.w*q.y),	2*(q.y*q.z - q.w*q.x),	q.w*q.w - q.x*q.x - q.y*q.y + q.z*q.z;
+	// std::cout << "Rot*X = " << std::endl << Rot*X << std::endl;
+	if(from_global_to_local)    return Rot*X;
+	else    return Rot.inverse()*X;
 }
 
 void PCFittingWalls::ClearCloud(void)
