@@ -6,8 +6,13 @@
 	<node pkg="rviz" type="rviz" name="rviz" args="-d /home/amsl/.rviz/trajectories_startpoint.rviz"/>
 
 	<include file="$(find velodyne_pointcloud)/launch/32e_points.launch"/>
+	
+	<!-- <node pkg="image_transport" type="republish" name="republish" args="compressed raw"> -->
+	<!-- 	<remap from="in" to="/camera/color/image_raw"/> -->
+	<!-- 	<remap from="out" to="/camera/color/image_raw"/> -->
+	<!-- </node> -->
 
-	<!-- own programs -->
+	<!-- proposed method -->
 	<node pkg="pose_estimation_walls" name="imu_initial_alignment" type="imu_initial_alignment" output="screen"/>
 	<node pkg="pose_estimation_walls" name="pc_fittingwalls" type="pc_fittingwalls"/>
 	<node pkg="pose_estimation_walls" name="ekf_pose" type="ekf_pose" output="screen"/>
@@ -16,6 +21,9 @@
 	<!-- loam velodyne	 -->
 	<include file="$(find loam_velodyne)/launch/hector_loam_velodyne.launch"/>
 	<node pkg="pose_estimation_walls" name="odom_creater_for_loamvelodyne" type="odom_creater_for_loamvelodyne"/>
+	<!-- gyrodometry -->
+	<node pkg="pose_estimation_walls" name="gyrodometry" type="gyrodometry"/>
+	
 	<!-- graph -->
 	<!-- <node pkg="pose_estimation_walls" name="graph_rpy" type="graph_rpy.py"/> -->
 </launch>
