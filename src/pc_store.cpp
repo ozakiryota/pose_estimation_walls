@@ -28,6 +28,10 @@ class PCStore{
 		/*time*/
 		ros::Time time_odom_now;
 		ros::Time time_odom_last;
+		/*limit storing*/
+		const bool limit_storing = true;
+		const size_t limit_num_scans = 100;
+		std::vector<size_t> list_num_scanpoints;
 
 	public:
 		PCStore();
@@ -75,8 +79,17 @@ void PCStore::CallbackOdom(const nav_msgs::OdometryConstPtr& msg)
 		pcl::transformPointCloud(*cloud_stored, *cloud_stored, offset, rotation);
 		*cloud_stored  += *cloud_now;
 		pc_was_added = true;
-			
+		
 		odom_last = odom_now;
+		
+		/*limit storing*/
+		if(limit_storing){
+			list_num_scanpoints.push_back(cloud_now->points.size());
+			if(list_num_scanpoints.size()>limit_num_scans){
+				cloud_stored->points.erase(cloud_stored->points.begin(), cloud_stored->points.begin() + list_num_scanpoints[0]);
+				list_num_scanpoints.erase(list_num_scanpoints.begin());
+			}
+		}
 	}
 	Visualizer();
 
