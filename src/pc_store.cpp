@@ -50,14 +50,14 @@ PCStore::PCStore()
 
 void PCStore::CallbackPC(const sensor_msgs::PointCloud2ConstPtr &msg)
 {
-	std::cout << "CALLBACK PC" << std::endl;
+	// std::cout << "CALLBACK PC" << std::endl;
 	pcl::fromROSMsg(*msg, *cloud_now);
 	pc_was_added = false;
 }
 
 void PCStore::CallbackOdom(const nav_msgs::OdometryConstPtr& msg)
 {
-	std::cout << "CALLBACK ODOM" << std::endl;
+	// std::cout << "CALLBACK ODOM" << std::endl;
 	odom_now = *msg;
 	time_odom_now = ros::Time::now();
 	double dt = (time_odom_now - time_odom_last).toSec();
@@ -89,6 +89,8 @@ void PCStore::CallbackOdom(const nav_msgs::OdometryConstPtr& msg)
 				cloud_stored->points.erase(cloud_stored->points.begin(), cloud_stored->points.begin() + list_num_scanpoints[0]);
 				list_num_scanpoints.erase(list_num_scanpoints.begin());
 			}
+			std::cout << "limit storing: true" << std::endl;
+			std::cout << "number of stored scans: " << list_num_scanpoints.size() << std::endl;
 		}
 	}
 	Visualizer();
