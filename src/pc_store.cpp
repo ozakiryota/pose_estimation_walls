@@ -24,6 +24,10 @@ class PCStore{
 		nav_msgs::Odometry odom_last;
 		/*flags*/
 		bool first_callback_odom = true;
+		bool pc_was_added = false;
+		/*time*/
+		ros::Time time_odom_now;
+		ros::Time time_odom_last;
 
 	public:
 		PCStore();
@@ -42,45 +46,35 @@ PCStore::PCStore()
 
 void PCStore::CallbackPC(const sensor_msgs::PointCloud2ConstPtr &msg)
 {
-	// if(!first_callback_odom){
-	// 	tf::Quaternion pose_now;
-	// 	tf::Quaternion pose_last;
-	// 	quaternionMsgToTF(odom_now.pose.pose.orientation, pose_now);
-	// 	quaternionMsgToTF(odom_last.pose.pose.orientation, pose_last);
-	// 	tf::Quaternion relative_rotation = pose_last*pose_now.inverse();
-	// 	Eigen::Quaternionf rotation(relative_rotation.w(), relative_rotation.x(), relative_rotation.y(), relative_rotation.z());
-	// 	Eigen::Vector3f offset(
-	// 			odom_last.pose.pose.position.x - odom_now.pose.pose.position.x,
-	// 			odom_last.pose.pose.position.y - odom_now.pose.pose.position.y,
-	// 			odom_last.pose.pose.position.z - odom_now.pose.pose.position.z);
-	// 	pcl::transformPointCloud(*cloud, *cloud, offset, rotation);
-    //
-	// 	pcl::PointCloud<pcl::PointXYZ>::Ptr tmp_cloud (new pcl::PointCloud<pcl::PointXYZ>);
-	// 	pcl::fromROSMsg(*msg, *tmp_cloud);
-	// 	*cloud += *tmp_cloud;
-    //
-	// 	odom_last = odom_now;
-	// }
+	std::cout << "CALLBACK PC" << std::endl;
 	pcl::fromROSMsg(*msg, *cloud_now);
+	pc_was_added = false;
 }
 
 void PCStore::CallbackOdom(const nav_msgs::OdometryConstPtr& msg)
 {
+	std::cout << "CALLBACK ODOM" << std::endl;
 	odom_now = *msg;
-	if(first_callback_odom)	odom_last = odom_now;
-	else{
+	time_odom_now = ros::Time::now();
+	double dt = (time_odom_now - time_odom_last).toSec();
+	time_odom_last = time_odom_now;
+	
+	if(first_callback_odom){
+		odom_last = odom_now;
+		dt = 0.0;
+	}
+	else if(!pc_was_added){
 		tf::Quaternion pose_now;
 		tf::Quaternion pose_last;
 		quaternionMsgToTF(odom_now.pose.pose.orientation, pose_now);
 		quaternionMsgToTF(odom_last.pose.pose.orientation, pose_last);
 		tf::Quaternion relative_rotation = pose_last*pose_now.inverse();
+		relative_rotation.normalize();	
 		Eigen::Quaternionf rotation(relative_rotation.w(), relative_rotation.x(), relative_rotation.y(), relative_rotation.z());
-		Eigen::Vector3f offset(
-				odom_last.pose.pose.position.x - odom_now.pose.pose.position.x,
-				odom_last.pose.pose.position.y - odom_now.pose.pose.position.y,
-				odom_last.pose.pose.position.z - odom_now.pose.pose.position.z);
+		Eigen::Vector3f offset(-odom_last.twist.twist.linear.x*dt, 0.0, 0.0);
 		pcl::transformPointCloud(*cloud_stored, *cloud_stored, offset, rotation);
 		*cloud_stored  += *cloud_now;
+		pc_was_added = true;
 			
 		odom_last = odom_now;
 	}
