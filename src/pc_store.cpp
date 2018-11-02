@@ -25,9 +25,6 @@ class PCStore{
 		/*flags*/
 		bool first_callback_odom = true;
 		bool pc_was_added = false;
-		/*time*/
-		ros::Time time_odom_now;
-		ros::Time time_odom_last;
 		/*limit storing*/
 		const bool limit_storing = true;
 		const size_t limit_num_scans = 100;
@@ -37,6 +34,7 @@ class PCStore{
 		PCStore();
 		void CallbackPC(const sensor_msgs::PointCloud2ConstPtr& msg);
 		void CallbackOdom(const nav_msgs::OdometryConstPtr& msg);
+		Eigen::MatrixXd FrameRotation(geometry_msgs::Quaternion q, Eigen::MatrixXd X, bool from_global_to_local);
 		void Visualizer(void);
 };
 
@@ -59,14 +57,7 @@ void PCStore::CallbackOdom(const nav_msgs::OdometryConstPtr& msg)
 {
 	// std::cout << "CALLBACK ODOM" << std::endl;
 	odom_now = *msg;
-	time_odom_now = ros::Time::now();
-	double dt = (time_odom_now - time_odom_last).toSec();
-	time_odom_last = time_odom_now;
-	
-	if(first_callback_odom){
-		odom_last = odom_now;
-		dt = 0.0;
-	}
+	if(first_callback_odom)	odom_last = odom_now;
 	else if(!pc_was_added){
 		tf::Quaternion pose_now;
 		tf::Quaternion pose_last;
@@ -75,7 +66,12 @@ void PCStore::CallbackOdom(const nav_msgs::OdometryConstPtr& msg)
 		tf::Quaternion relative_rotation = pose_last*pose_now.inverse();
 		relative_rotation.normalize();	
 		Eigen::Quaternionf rotation(relative_rotation.w(), relative_rotation.x(), relative_rotation.y(), relative_rotation.z());
-		Eigen::Vector3f offset(-odom_last.twist.twist.linear.x*dt, 0.0, 0.0);
+		Eigen::MatrixXd GlobalMove(3, 1);
+		GlobalMove <<	odom_last.pose.pose.position.x - odom_now.pose.pose.position.x,
+						odom_last.pose.pose.position.y - odom_now.pose.pose.position.y,
+						odom_last.pose.pose.position.z - odom_now.pose.pose.position.z;
+		Eigen::MatrixXd LocalMove = FrameRotation(odom_last.pose.pose.orientation, GlobalMove, true);
+		Eigen::Vector3f offset(LocalMove(0, 0), LocalMove(1, 0), LocalMove(2, 0));
 		pcl::transformPointCloud(*cloud_stored, *cloud_stored, offset, rotation);
 		*cloud_stored  += *cloud_now;
 		pc_was_added = true;
@@ -93,10 +89,22 @@ void PCStore::CallbackOdom(const nav_msgs::OdometryConstPtr& msg)
 			std::cout << "number of stored scans: " << list_num_scanpoints.size() << std::endl;
 		}
 	}
-	Visualizer();
-
 	first_callback_odom = false;
+
+	Visualizer();
 }
+
+Eigen::MatrixXd PCStore::FrameRotation(geometry_msgs::Quaternion q, Eigen::MatrixXd X, bool from_global_to_local)
+{
+	Eigen::MatrixXd Rot(3, 3); 
+	Rot <<  q.w*q.w + q.x*q.x - q.y*q.y - q.z*q.z,  2*(q.x*q.y + q.w*q.z),  2*(q.x*q.z - q.w*q.y),
+			2*(q.x*q.y - q.w*q.z),  q.w*q.w - q.x*q.x + q.y*q.y - q.z*q.z,  2*(q.y*q.z + q.w*q.x),
+			2*(q.x*q.z + q.w*q.y),  2*(q.y*q.z - q.w*q.x),  q.w*q.w - q.x*q.x - q.y*q.y + q.z*q.z;
+	// std::cout << "X = " << std::endl << X << std::endl;
+	if(from_global_to_local)    return Rot*X;
+	else    return Rot.inverse()*X;
+}
+
 void PCStore::Visualizer(void)
 {
 	viewer.removePointCloud("cloud");

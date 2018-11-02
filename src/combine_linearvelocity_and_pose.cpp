@@ -13,13 +13,11 @@ class CombineLinearVelocityAndPose{
 		ros::Subscriber sub_pose;
 		/*publish*/
 		ros::Publisher pub;
-		/*time*/
-		ros::Time time_odom_now;
-		ros::Time time_odom_last;
-		/*objects*/
-		nav_msgs::Odometry odom_now;
-		nav_msgs::Odometry odom_last;
-		Eigen::MatrixXd Position;
+		/*odom*/
+		nav_msgs::Odometry odom2d_now;
+		nav_msgs::Odometry odom2d_last;
+		nav_msgs::Odometry odom3d_now;
+		nav_msgs::Odometry odom3d_last;
 		/*flags*/
 		bool first_callback_odom = true;
 	public:
@@ -36,9 +34,8 @@ CombineLinearVelocityAndPose::CombineLinearVelocityAndPose()
 	sub_odom = nh.subscribe("/odom", 1, &CombineLinearVelocityAndPose::CallbackOdom, this);
 	sub_pose = nh.subscribe("/pose_ekf", 1, &CombineLinearVelocityAndPose::CallbackPose, this);
 	pub = nh.advertise<nav_msgs::Odometry>("/combined_odometry", 1);
-	Position = Eigen::MatrixXd::Constant(3, 1, 0.0);
-	InitializeOdom(odom_now);
-	InitializeOdom(odom_last);
+	InitializeOdom(odom3d_now);
+	InitializeOdom(odom3d_last);
 }
 
 void CombineLinearVelocityAndPose::InitializeOdom(nav_msgs::Odometry& odom)
@@ -56,38 +53,30 @@ void CombineLinearVelocityAndPose::InitializeOdom(nav_msgs::Odometry& odom)
 
 void CombineLinearVelocityAndPose::CallbackOdom(const nav_msgs::OdometryConstPtr& msg)
 {
-	time_odom_now = ros::Time::now();
-	double dt = (time_odom_now - time_odom_last).toSec();
-	time_odom_last = time_odom_now;
-
-	odom_now.twist = msg->twist;
-
-	if(first_callback_odom){
-		dt = 0.0;
-		odom_last = odom_now;
-	}
+	odom2d_now = *msg;
+	if(first_callback_odom)	odom2d_last = odom2d_now;
 	
-	Eigen::MatrixXd LocalVel(3, 1);
-	LocalVel <<	msg->twist.twist.linear.x,
-		  		msg->twist.twist.linear.y,
-				msg->twist.twist.linear.z;
-	Eigen::MatrixXd GlobalVel = FrameRotation(odom_last.pose.pose.orientation, LocalVel, false);
-	Position = Position + GlobalVel*dt;
+	Eigen::MatrixXd GlobalMove2d(3, 1);
+	GlobalMove2d <<	odom2d_now.pose.pose.position.x - odom2d_last.pose.pose.position.x,
+					odom2d_now.pose.pose.position.y - odom2d_last.pose.pose.position.y,
+					odom2d_now.pose.pose.position.z - odom2d_last.pose.pose.position.z;
+	Eigen::MatrixXd LocalMove2d = FrameRotation(odom2d_last.pose.pose.orientation, GlobalMove2d, true);
+	Eigen::MatrixXd GlobalMove3d = FrameRotation(odom3d_last.pose.pose.orientation, LocalMove2d, false);
 
-	odom_now.pose.pose.position.x = Position(0, 0);
-	odom_now.pose.pose.position.y = Position(1, 0);
-	odom_now.pose.pose.position.z = Position(2, 0);
-
-	odom_last = odom_now;
+	odom3d_now.pose.pose.position.x = odom3d_last.pose.pose.position.x + GlobalMove3d(0, 0);
+	odom3d_now.pose.pose.position.y = odom3d_last.pose.pose.position.y + GlobalMove3d(1, 0);
+	odom3d_now.pose.pose.position.z = odom3d_last.pose.pose.position.z + GlobalMove3d(2, 0);
 	
-	Publisher();
-
+	odom2d_last = odom2d_now;
+	odom3d_last = odom3d_now;
 	first_callback_odom = false;
+
+	Publisher();
 }
 
 void CombineLinearVelocityAndPose::CallbackPose(const geometry_msgs::PoseStampedConstPtr& msg)
 {
-	odom_now.pose.pose.orientation = msg->pose.orientation;
+	odom3d_now.pose.pose.orientation = msg->pose.orientation;
 }
 
 Eigen::MatrixXd CombineLinearVelocityAndPose::FrameRotation(geometry_msgs::Quaternion q, Eigen::MatrixXd X, bool from_global_to_local)
@@ -104,17 +93,17 @@ Eigen::MatrixXd CombineLinearVelocityAndPose::FrameRotation(geometry_msgs::Quate
 void CombineLinearVelocityAndPose::Publisher(void)
 {
 	/*publish*/
-	pub.publish(odom_now);
-	/*tf*/
+	pub.publish(odom3d_now);
+	/*tf broadcast */
 	static tf::TransformBroadcaster broadcaster;
     geometry_msgs::TransformStamped transform;
 	transform.header.stamp = ros::Time::now();
 	transform.header.frame_id = "/odom";
 	transform.child_frame_id = "/combined_odometry";
-	transform.transform.translation.x = odom_now.pose.pose.position.x;
-	transform.transform.translation.y = odom_now.pose.pose.position.y;
-	transform.transform.translation.z = odom_now.pose.pose.position.z;
-	transform.transform.rotation = odom_now.pose.pose.orientation;
+	transform.transform.translation.x = odom3d_now.pose.pose.position.x;
+	transform.transform.translation.y = odom3d_now.pose.pose.position.y;
+	transform.transform.translation.z = odom3d_now.pose.pose.position.z;
+	transform.transform.rotation = odom3d_now.pose.pose.orientation;
 	broadcaster.sendTransform(transform);
 }
 
