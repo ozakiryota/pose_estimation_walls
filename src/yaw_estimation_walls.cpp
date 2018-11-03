@@ -35,6 +35,7 @@ class YawEstimationWalls{
 		void CallbackPose(const geometry_msgs::PoseStampedConstPtr &msg);
 		void CallbackNormals(const sensor_msgs::PointCloud2ConstPtr &msg);
 		void MatchWalls(void);
+		tf::Quaternion ComputeRotation(pcl::PointXYZ p1, pcl::PointXYZ p2);
 		void Visualizer(void);
 };
 
@@ -108,6 +109,10 @@ void YawEstimationWalls::MatchWalls(void)
 		}
 		walls_last = walls_now;
 	}
+}
+
+tf::Quaternion YawEstimationWalls::ComputeRotation(pcl::PointXYZ p1, pcl::PointXYZ p2);
+{
 }
 
 void YawEstimationWalls::Visualizer(void)
