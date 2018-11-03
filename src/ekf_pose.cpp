@@ -5,6 +5,8 @@
 #include <sensor_msgs/PointCloud2.h>
 #include <pcl_conversions/pcl_conversions.h>
 #include <tf/tf.h>
+#include <pcl/common/transforms.h>
+#include <pcl/kdtree/kdtree_flann.h>
 // #include <Eigen/Core>
 // #include <Eigen/LU>
 
@@ -39,6 +41,10 @@ class EKFPose{
 		/*time*/
 		ros::Time time_imu_now;
 		ros::Time time_imu_last;
+		/*for yaw estimation with walls*/
+		tf::Quaternion q_pose_last_at_wallscall;
+		pcl::PointCloud<pcl::PointXYZ>::Ptr walls_now {new pcl::PointCloud<pcl::PointXYZ>};
+		pcl::PointCloud<pcl::PointXYZ>::Ptr walls_last {new pcl::PointCloud<pcl::PointXYZ>};
 	public:
 		EKFPose();
 		void CallbackInipose(const geometry_msgs::QuaternionConstPtr& msg);
@@ -48,7 +54,8 @@ class EKFPose{
 		void CallbackSLAM(const geometry_msgs::PoseStampedConstPtr& msg);
 		void ObservationSLAM(void);
 		void CallbackWalls(const sensor_msgs::PointCloud2ConstPtr& msg);
-		void ObservationWalls(pcl::PointNormal g_vector, pcl::PointCloud<pcl::PointNormal>::Ptr normals);
+		void ObservationWalls(pcl::PointNormal g_vector);
+		bool YawEstimationWalls(double& yaw_walls);
 		void Publisher();
 };
 
@@ -202,12 +209,6 @@ void EKFPose::ObservationSLAM(void)
 	}
 	S = jH*P*jH.transpose() + R;
 	K = P*jH.transpose()*S.inverse();
-	// K(0, 0) = 0.0;	//temporary repair
-	// K(0, 1) = 0.0;	//temporary repair
-	// K(0, 2) = 0.0;	//temporary repair
-	// K(1, 0) = 0.0;	//temporary repair
-	// K(1, 1) = 0.0;	//temporary repair
-	// K(1, 2) = 0.0;	//temporary repair
 	X = X + K*Y;
 	P = (I - K*jH)*P;
 
@@ -231,18 +232,26 @@ void EKFPose::CallbackWalls(const sensor_msgs::PointCloud2ConstPtr& msg)
 {
 	pcl::PointCloud<pcl::PointNormal>::Ptr tmp_normals (new pcl::PointCloud<pcl::PointNormal>);
 	pcl::PointNormal g_vector;
-	pcl::PointCloud<pcl::PointNormal>::Ptr normals (new pcl::PointCloud<pcl::PointNormal>);
 	pcl::fromROSMsg(*msg, *tmp_normals);
+	walls_now->points.clear();
 	for(size_t i=0;i<tmp_normals->points.size();i++){
 		if(i==0)	g_vector = tmp_normals->points[i];
-		else	normals->points.push_back(tmp_normals->points[i]);
+		else{
+			pcl::PointXYZ tmp_point;
+			tmp_point.x = tmp_normals->points[i].normal_x;
+			tmp_point.y = tmp_normals->points[i].normal_y;
+			tmp_point.z = tmp_normals->points[i].normal_z;
+			walls_now->points.push_back(tmp_point);
+		}
 	}
-	if(inipose_is_available)	ObservationWalls(g_vector, normals);
-	
+	if(inipose_is_available)	ObservationWalls(g_vector);
+	q_pose_last_at_wallscall = q_pose;
+	*walls_last = *walls_now;
+
 	Publisher();
 }
 
-void EKFPose::ObservationWalls(pcl::PointNormal g_vector, pcl::PointCloud<pcl::PointNormal>::Ptr normals)
+void EKFPose::ObservationWalls(pcl::PointNormal g_vector)
 {
 	const int num_obs = 3;
 		
@@ -258,6 +267,8 @@ void EKFPose::ObservationWalls(pcl::PointNormal g_vector, pcl::PointCloud<pcl::P
 	Z <<	atan2(gy, gz),
 	  		atan2(-gx, sqrt(gy*gy + gz*gz)),
 			X(2, 0);
+	double yaw_walls;
+	if(YawEstimationWalls(yaw_walls))	Z(2, 0) = yaw_walls;
 	Eigen::MatrixXd H(num_obs, num_state);
 	H <<	1,	0,	0,
 			0,	1,	0,
@@ -269,6 +280,9 @@ void EKFPose::ObservationWalls(pcl::PointNormal g_vector, pcl::PointCloud<pcl::P
 	Eigen::MatrixXd R(num_obs, num_obs);
 	const double sigma = 1.0e+1;
 	R = sigma*Eigen::MatrixXd::Identity(num_obs, num_obs);
+	R <<	1.0e+1,	0, 0,
+	  		0,	1.0e+2,	0,
+			0,	0,	1.0e+1;
 	Eigen::MatrixXd Y(num_obs, 1);
 	Eigen::MatrixXd S(num_obs, num_obs);
 	Eigen::MatrixXd K(num_state, num_obs);
@@ -281,9 +295,9 @@ void EKFPose::ObservationWalls(pcl::PointNormal g_vector, pcl::PointCloud<pcl::P
 	}
 	S = jH*P*jH.transpose() + R;
 	K = P*jH.transpose()*S.inverse();
-	K(2, 0) = 0.0;	//temporary repair
-	K(2, 1) = 0.0;	//temporary repair
-	K(2, 2) = 0.0;	//temporary repair
+	// K(2, 0) = 0.0;	//temporary repair
+	// K(2, 1) = 0.0;	//temporary repair
+	// K(2, 2) = 0.0;	//temporary repair
 	X = X + K*Y;
 	P = (I - K*jH)*P;
 		
@@ -296,6 +310,61 @@ void EKFPose::ObservationWalls(pcl::PointNormal g_vector, pcl::PointCloud<pcl::P
 	std::cout << "K*Y = " << std::endl << K*Y << std::endl;
 	
 	q_pose = tf::createQuaternionFromRPY(X(0, 0), X(1, 0), X(2, 0));
+}
+
+bool EKFPose::YawEstimationWalls(double& yaw_walls)
+{
+	if(walls_last->points.empty()){
+		*walls_last = *walls_now;
+		return false;
+	}
+	else{
+		/*rotate wall points*/
+		pcl::PointCloud<pcl::PointXYZ>::Ptr walls_now_rotated (new pcl::PointCloud<pcl::PointXYZ>);
+		tf::Quaternion relative_rotation = q_pose*q_pose_last_at_wallscall.inverse();
+		relative_rotation.normalize();
+		Eigen::Quaternionf rotation(relative_rotation.w(), relative_rotation.x(), relative_rotation.y(), relative_rotation.z());
+		Eigen::Vector3f offset(0.0, 0.0, 0.0);
+		pcl::transformPointCloud(*walls_now, *walls_now_rotated, offset, rotation);
+		/*matching*/
+		int k = 1;
+		pcl::KdTreeFLANN<pcl::PointXYZ> kdtree;
+		std::vector<int> pointIdxNKNSearch(k);
+		std::vector<float> pointNKNSquaredDistance(k);
+		kdtree.setInputCloud(walls_now_rotated);
+		const double threshold_matching_distance = 0.3;
+		std::vector<double> list_yawrate;
+		for(size_t i=0;i<walls_last->points.size();i++){
+			if(kdtree.nearestKSearch(walls_last->points[i], k, pointIdxNKNSearch, pointNKNSquaredDistance)<=0)	std::cout << "kdtree error" << std::endl;
+			if(sqrt(pointNKNSquaredDistance[0])<threshold_matching_distance){
+				tf::Quaternion q1(
+						walls_now->points[pointIdxNKNSearch[0]].x,
+						walls_now->points[pointIdxNKNSearch[0]].y,
+						walls_now->points[pointIdxNKNSearch[0]].z,
+						1.0);
+				tf::Quaternion q2(
+						walls_last->points[i].x,
+						walls_last->points[i].y,
+						walls_last->points[i].z,
+						1.0);
+				tf::Quaternion relative_rotation_ = (q_pose*q2)*(q_pose*q1).inverse();
+				relative_rotation_.normalize();
+				double roll_rate, pitch_rate, yaw_rate;
+				tf::Matrix3x3(relative_rotation_).getRPY(roll_rate, pitch_rate, yaw_rate);
+				list_yawrate.push_back(yaw_rate);
+			}
+		}
+		if(!list_yawrate.empty()){
+			double yawrate_ave = 0.0;
+			for(size_t i=0;i<list_yawrate.size();i++)	yawrate_ave += list_yawrate[i]/(double)list_yawrate.size();
+			std::cout << "estimated yaw with walls" << std::endl;
+			double roll, pitch, yaw;
+			tf::Matrix3x3(q_pose_last_at_wallscall).getRPY(roll, pitch, yaw);
+			yaw_walls = atan2(sin(yaw + yawrate_ave), cos(yaw + yawrate_ave));
+			return true;
+		}
+		else	return false;
+	}
 }
 
 void EKFPose::Publisher(void)
