@@ -215,7 +215,8 @@ void EKFPose::ObservationSLAM(void)
 		if(X(i, 0)>M_PI)	X(i, 0) -= 2.0*M_PI;
 		else if(X(i, 0)<-M_PI)	X(i, 0) += 2.0*M_PI;
 	}
-	
+
+	count_slam++;
 	if(count_slam%500==0){
 		std::cout << count_slam << ": CALLBACK SLAM" << std::endl;
 		std::cout << "Y = " << std::endl << Y << std::endl;

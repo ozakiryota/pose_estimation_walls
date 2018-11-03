@@ -2,25 +2,25 @@
 #include <nav_msgs/Odometry.h>
 #include <tf/transform_broadcaster.h>
 
-class VelodyneOdometry{
+class OdomCreaterForLoamVelodyne{
 	private:
 		ros::NodeHandle nh;
 		ros::Subscriber sub;
 		ros::Publisher pub;
 		nav_msgs::Odometry odom_out;
 	public:
-		VelodyneOdometry();
+		OdomCreaterForLoamVelodyne();
 		void Callback(const nav_msgs::OdometryConstPtr& msg);
 		void BroadcastTF(void);
 };
 
-VelodyneOdometry::VelodyneOdometry()
+OdomCreaterForLoamVelodyne::OdomCreaterForLoamVelodyne()
 {
-	sub = nh.subscribe("/integrated_to_init", 1, &VelodyneOdometry::Callback, this);
+	sub = nh.subscribe("/integrated_to_init", 1, &OdomCreaterForLoamVelodyne::Callback, this);
 	pub = nh.advertise<nav_msgs::Odometry>("/loamvelodyne_odometry", 1);
 }
 
-void VelodyneOdometry::Callback(const nav_msgs::OdometryConstPtr& msg)
+void OdomCreaterForLoamVelodyne::Callback(const nav_msgs::OdometryConstPtr& msg)
 {
 	odom_out = *msg;
 	odom_out.header.frame_id = "/odom";
@@ -35,7 +35,7 @@ void VelodyneOdometry::Callback(const nav_msgs::OdometryConstPtr& msg)
 	BroadcastTF();
 }
 
-void VelodyneOdometry::BroadcastTF(void)
+void OdomCreaterForLoamVelodyne::BroadcastTF(void)
 {
 	static tf::TransformBroadcaster broadcaster;
     geometry_msgs::TransformStamped transform;
@@ -52,7 +52,7 @@ int main(int argc, char** argv)
 {
 	ros::init(argc, argv, "odom_creater_for_loamvelodyne");
 
-	VelodyneOdometry velodyne_odometry;
+	OdomCreaterForLoamVelodyne velodyne_odometry;
 
 	ros::spin();
 }

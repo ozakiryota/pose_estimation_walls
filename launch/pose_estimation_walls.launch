@@ -1,16 +1,16 @@
 <launch>
 	<param name="use_sim_time" value="true"/>
 	
-	<node pkg="rosbag" type="play" name="player" args="--clock /home/amsl/ozaki/bagfiles/velodyne_realsense/2018-10-06-12-14-59.bag"/>
+	<node pkg="rosbag" type="play" name="player" args="--clock /home/amsl/ozaki/bagfiles/velodyne_realsense/2018-10-06-12-14-59.bag -s 100"/>
 
 	<node pkg="rviz" type="rviz" name="rviz" args="-d /home/amsl/.rviz/trajectories_startpoint.rviz"/>
 
 	<include file="$(find velodyne_pointcloud)/launch/32e_points.launch"/>
 	
-	<!-- <node pkg="image_transport" type="republish" name="republish" args="compressed raw"> -->
-	<!-- 	<remap from="in" to="/camera/color/image_raw"/> -->
-	<!-- 	<remap from="out" to="/camera/color/image_raw"/> -->
-	<!-- </node> -->
+	<node pkg="image_transport" type="republish" name="republish" args="compressed raw">
+		<remap from="in" to="/camera/color/image_raw"/>
+		<remap from="out" to="/camera/color/image_raw"/>
+	</node>
 
 	<!-- proposed method -->
 	<node pkg="pose_estimation_walls" name="imu_initial_alignment" type="imu_initial_alignment" output="screen"/>
@@ -18,10 +18,12 @@
 	<node pkg="pose_estimation_walls" name="ekf_pose" type="ekf_pose" output="screen"/>
 	<node pkg="pose_estimation_walls" name="combine_linearvelocity_and_pose" type="combine_linearvelocity_and_pose"/>
 	<node pkg="pose_estimation_walls" name="yaw_estimation_walls" type="yaw_estimation_walls"/>
-	<!-- loam velodyne	 -->
+	<node pkg="pose_estimation_walls" name="combine_linearvelocity_and_yawrate" type="combine_linearvelocity_and_yawrate"/>
+	
+	<!-- comparisons	 -->
 	<include file="$(find loam_velodyne)/launch/hector_loam_velodyne.launch"/>
 	<node pkg="pose_estimation_walls" name="odom_creater_for_loamvelodyne" type="odom_creater_for_loamvelodyne"/>
-	<!-- gyrodometry -->
+	<!-- <node pkg="pose_estimation_walls" name="odom_creater_for_lsdslam" type="odom_creater_for_lsdslam"/> -->
 	<node pkg="pose_estimation_walls" name="gyrodometry" type="gyrodometry"/>
 	
 	<!-- graph -->

@@ -85,6 +85,7 @@ void YawEstimationWalls::MatchWalls(void)
 	// std::cout << "MATCh WALLS" << std::endl;
 	if(walls_last->points.empty()){
 		*walls_last = *walls_now;
+		viewer.addSphere (walls_last->points[0], 1.0, 0.5, 0.5, 0.0, "sphere");
 	}
 	else{
 		/*rotate wall points*/
@@ -99,21 +100,23 @@ void YawEstimationWalls::MatchWalls(void)
 		std::vector<int> pointIdxNKNSearch(k);
 		std::vector<float> pointNKNSquaredDistance(k);
 		kdtree.setInputCloud(walls_now_rotated);
-		const double threshold_matching_distance = 0.1;
+		const double threshold_matching_distance = 0.3;
 		// std::vector<bool> list_matched(walls_last->points.size(), false);
 		std::vector<double> list_yawrate;
 		for(size_t i=0;i<walls_last->points.size();i++){
 			if(kdtree.nearestKSearch(walls_last->points[i], k, pointIdxNKNSearch, pointNKNSquaredDistance)<=0)	std::cout << "kdtree error" << std::endl;
-			if(pointNKNSquaredDistance[0]<threshold_matching_distance){
+			if(sqrt(pointNKNSquaredDistance[0])<threshold_matching_distance){
+				std::cout << "pointNKNSquaredDistance[0] = " << pointNKNSquaredDistance[0] << std::endl;
+				std::cout << "sqrt(pointNKNSquaredDistance[0]) = " << sqrt(pointNKNSquaredDistance[0]) << std::endl;
 				double yawrate = ComputeYawRate(walls_now->points[pointIdxNKNSearch[0]], walls_last->points[i]);
 				list_yawrate.push_back(yawrate);
 			}
 		}
+		viewer.updateSphere(walls_last->points[0], threshold_matching_distance, 0.5, 0.5, 0.0, "sphere");
 		if(!list_yawrate.empty()){
-			/*compute average*/
 			double yawrate_ave = 0.0;
 			for(size_t i=0;i<list_yawrate.size();i++)	yawrate_ave += list_yawrate[i]/(double)list_yawrate.size();
-			std::cout << "yaw rate = " << yawrate_ave << std::endl;
+			// std::cout << "yaw rate = " << yawrate_ave << std::endl;
 			pub.publish(yawrate_ave);
 		}
 	}
@@ -121,10 +124,14 @@ void YawEstimationWalls::MatchWalls(void)
 
 double YawEstimationWalls::ComputeYawRate(pcl::PointXYZ p_origin, pcl::PointXYZ p_target)
 {
-	tf::Quaternion q1(p_origin.x, p_origin.y, p_origin.z, 0.0);
-	tf::Quaternion q2(p_target.x, p_target.y, p_target.z, 0.0);
+	tf::Quaternion q1(p_origin.x, p_origin.y, p_origin.z, 1.0);
+	tf::Quaternion q2(p_target.x, p_target.y, p_target.z, 1.0);
+	tf::Quaternion relative_rotation = (pose_now*q2)*(pose_now*q1).inverse();
+	relative_rotation.normalize();
 	double roll, pitch, yaw;
-	tf::Matrix3x3(q2*q1.inverse()).getRPY(roll, pitch, yaw);
+	tf::Matrix3x3(relative_rotation).getRPY(roll, pitch, yaw);
+	std::cout << "yaw rate = " << yaw << std::endl;
+	std::cout << "acosf(q1.x()*q2.x()+q1.y()*q2.y()+q1.z()*q2.z()) = " << acosf(q1.x()*q2.x()+q1.y()*q2.y()+q1.z()*q2.z()) << std::endl;
 	return yaw;
 }
 

@@ -62,6 +62,9 @@ PCFittingWalls::PCFittingWalls()
 	g_vector_from_ekf->points[0].x = 0.0;
 	g_vector_from_ekf->points[0].y = 0.0;
 	g_vector_from_ekf->points[0].z = 0.0;
+	g_vector_from_ekf->points[0].normal_x = 0.0;
+	g_vector_from_ekf->points[0].normal_y = 0.0;
+	g_vector_from_ekf->points[0].normal_z = -1.0;
 	g_vector->points.resize(1);
 	g_vector->points[0].x = 0.0;
 	g_vector->points[0].y = 0.0;
@@ -256,6 +259,8 @@ void PCFittingWalls::PointCluster(void)
 			std::vector<float> pointNKNSquaredDistance(k);
 			kdtree.setInputCloud(gaussian_sphere_clustered);
 			if(kdtree.nearestKSearch(gaussian_sphere_clustered->points[i], k, pointIdxNKNSearch, pointNKNSquaredDistance)<=0)	std::cout << "kdtree error" << std::endl;
+			// std::cout << "pointNKNSquaredDistance[1] = " << pointNKNSquaredDistance[1] << std::endl;
+			// std::cout << "sqrt(pointNKNSquaredDistance[1]) = " << sqrt(pointNKNSquaredDistance[1]) << std::endl;
 			if(i==0){
 				shortest_distance = pointNKNSquaredDistance[1];
 				merge_pair_indices[0] = i;
@@ -267,8 +272,8 @@ void PCFittingWalls::PointCluster(void)
 				merge_pair_indices[1] = pointIdxNKNSearch[1];
 			}
 		}
-		const double threshold_merge_distance = 0.1;
-		if(shortest_distance>threshold_merge_distance){
+		const double threshold_merge_distance = 0.15;
+		if(sqrt(shortest_distance)>threshold_merge_distance){
 			std::cout << ">> finished merging" << std::endl;
 			break;
 		}
@@ -322,7 +327,7 @@ void PCFittingWalls::PointPreCluster(std::vector<int>& list_num_belongings)
 	std::cout << "POINT PRE CLUSTER" << std::endl;
 	const int k = 2;
 	kdtree.setInputCloud(gaussian_sphere_clustered);
-	const double threshold_merge_distance = 0.005;
+	const double threshold_merge_distance = 0.05;
 	std::vector<bool> list_point_need_to_be_erased(gaussian_sphere_clustered->points.size(), false);
 	std::vector<bool> list_point_is_merged(gaussian_sphere_clustered->points.size(), false);
 	for(size_t i=0;i<gaussian_sphere_clustered->points.size();i++){
@@ -330,7 +335,7 @@ void PCFittingWalls::PointPreCluster(std::vector<int>& list_num_belongings)
 		std::vector<int> pointIdxNKNSearch(k);
 		std::vector<float> pointNKNSquaredDistance(k);
 		if(kdtree.nearestKSearch(gaussian_sphere_clustered->points[i], k, pointIdxNKNSearch, pointNKNSquaredDistance)<=0)	std::cout << "kdtree error" << std::endl;
-		if(!list_point_is_merged[pointIdxNKNSearch[1]] && pointNKNSquaredDistance[1]<threshold_merge_distance){
+		if(!list_point_is_merged[pointIdxNKNSearch[1]] && sqrt(pointNKNSquaredDistance[1])<threshold_merge_distance){
 			/*merge*/
 			gaussian_sphere_clustered->points[i] = PointMerge(i, pointIdxNKNSearch[1], list_num_belongings);
 			list_num_belongings[i] += list_num_belongings[pointIdxNKNSearch[1]];
