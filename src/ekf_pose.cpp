@@ -289,10 +289,11 @@ void EKFPose::ObservationWalls(pcl::PointNormal g_vector)
 	Eigen::MatrixXd I = Eigen::MatrixXd::Identity(num_state, num_state);
 
 	Y = Z - H*X;
-	for(int i=0;i<3;i++){
-		if(Y(i, 0)>M_PI)	Y(i, 0) -= 2.0*M_PI;
-		if(Y(i, 0)<-M_PI)	Y(i, 0) += 2.0*M_PI;
-	}
+	for(int i=0;i<num_obs;i++)	Y(i, 0) = atan2(sin(Y(i, 0)), cos(Y(i, 0)));
+	// for(int i=0;i<3;i++){
+	// 	if(Y(i, 0)>M_PI)	Y(i, 0) -= 2.0*M_PI;
+	// 	if(Y(i, 0)<-M_PI)	Y(i, 0) += 2.0*M_PI;
+	// }
 	S = jH*P*jH.transpose() + R;
 	K = P*jH.transpose()*S.inverse();
 	// K(2, 0) = 0.0;	//temporary repair
