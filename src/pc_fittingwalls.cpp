@@ -272,7 +272,7 @@ void PCFittingWalls::PointCluster(void)
 				merge_pair_indices[1] = pointIdxNKNSearch[1];
 			}
 		}
-		const double threshold_merge_distance = 0.15;
+		const double threshold_merge_distance = 0.1;
 		if(sqrt(shortest_distance)>threshold_merge_distance){
 			std::cout << ">> finished merging" << std::endl;
 			break;
@@ -287,7 +287,7 @@ void PCFittingWalls::PointCluster(void)
 		}
 	}
 	/*erase outlier*/
-	const int threshold_num_belongings = 30;
+	const int threshold_num_belongings = 25;
 	for(size_t i=0;i<list_num_belongings.size();i++){
 		if(list_num_belongings[i]<threshold_num_belongings){
 			gaussian_sphere_clustered->points.erase(gaussian_sphere_clustered->points.begin() + i);
@@ -393,6 +393,12 @@ bool PCFittingWalls::GVectorEstimation(void)
 		g_vector->points[0].normal_x = plane_parameters[0];
 		g_vector->points[0].normal_y = plane_parameters[1];
 		g_vector->points[0].normal_z = plane_parameters[2];
+	}
+	/*if angle variation is too large, estimation would be wrong*/
+	const double threshold_angle_variation = 60.0;	//[deg]
+	if(fabs(AngleBetweenVectors(g_vector->points[0], g_vector_from_ekf->points[0]))>threshold_angle_variation/180.0*M_PI){
+		std::cout << ">> angle variation of g in 1 step is too large and would be wrong " << std::endl;
+		return false;
 	}
 	/*normalization*/
 	double norm_g = sqrt(g_vector->points[0].normal_x*g_vector->points[0].normal_x + g_vector->points[0].normal_y*g_vector->points[0].normal_y + g_vector->points[0].normal_z*g_vector->points[0].normal_z);

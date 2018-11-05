@@ -268,7 +268,9 @@ void EKFPose::ObservationWalls(pcl::PointNormal g_vector)
 	  		atan2(-gx, sqrt(gy*gy + gz*gz)),
 			X(2, 0);
 	double yaw_walls;
-	if(YawEstimationWalls(yaw_walls))	Z(2, 0) = yaw_walls;
+	if(YawEstimationWalls(yaw_walls))	Z <<	atan2(gy, gz),
+	  											atan2(-gx, sqrt(gy*gy + gz*gz)),
+												yaw_walls;
 	Eigen::MatrixXd H(num_obs, num_state);
 	H <<	1,	0,	0,
 			0,	1,	0,
@@ -281,7 +283,7 @@ void EKFPose::ObservationWalls(pcl::PointNormal g_vector)
 	const double sigma = 1.0e+1;
 	R = sigma*Eigen::MatrixXd::Identity(num_obs, num_obs);
 	R <<	1.0e+1,	0, 0,
-	  		0,	1.0e+2,	0,
+	  		0,	1.0e+1,	0,
 			0,	0,	1.0e+1;
 	Eigen::MatrixXd Y(num_obs, 1);
 	Eigen::MatrixXd S(num_obs, num_obs);
@@ -289,11 +291,11 @@ void EKFPose::ObservationWalls(pcl::PointNormal g_vector)
 	Eigen::MatrixXd I = Eigen::MatrixXd::Identity(num_state, num_state);
 
 	Y = Z - H*X;
-	for(int i=0;i<num_obs;i++)	Y(i, 0) = atan2(sin(Y(i, 0)), cos(Y(i, 0)));
-	// for(int i=0;i<3;i++){
-	// 	if(Y(i, 0)>M_PI)	Y(i, 0) -= 2.0*M_PI;
-	// 	if(Y(i, 0)<-M_PI)	Y(i, 0) += 2.0*M_PI;
-	// }
+	// for(int i=0;i<num_obs;i++)	Y(i, 0) = atan2(sin(Y(i, 0)), cos(Y(i, 0)));
+	for(int i=0;i<3;i++){
+		if(Y(i, 0)>M_PI)	Y(i, 0) -= 2.0*M_PI;
+		if(Y(i, 0)<-M_PI)	Y(i, 0) += 2.0*M_PI;
+	}
 	S = jH*P*jH.transpose() + R;
 	K = P*jH.transpose()*S.inverse();
 	// K(2, 0) = 0.0;	//temporary repair
@@ -333,7 +335,7 @@ bool EKFPose::YawEstimationWalls(double& yaw_walls)
 		std::vector<int> pointIdxNKNSearch(k);
 		std::vector<float> pointNKNSquaredDistance(k);
 		kdtree.setInputCloud(walls_now_rotated);
-		const double threshold_matching_distance = 0.3;
+		const double threshold_matching_distance = 0.4;
 		std::vector<double> list_yawrate;
 		for(size_t i=0;i<walls_last->points.size();i++){
 			if(kdtree.nearestKSearch(walls_last->points[i], k, pointIdxNKNSearch, pointNKNSquaredDistance)<=0)	std::cout << "kdtree error" << std::endl;
@@ -348,7 +350,7 @@ bool EKFPose::YawEstimationWalls(double& yaw_walls)
 						walls_last->points[i].y,
 						walls_last->points[i].z,
 						1.0);
-				tf::Quaternion relative_rotation_ = (q_pose*q2)*(q_pose*q1).inverse();
+				tf::Quaternion relative_rotation_ = (q_pose_last_at_wallscall*q2)*(q_pose_last_at_wallscall*q1).inverse();
 				relative_rotation_.normalize();
 				double roll_rate, pitch_rate, yaw_rate;
 				tf::Matrix3x3(relative_rotation_).getRPY(roll_rate, pitch_rate, yaw_rate);

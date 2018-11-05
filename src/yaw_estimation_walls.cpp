@@ -100,7 +100,7 @@ void YawEstimationWalls::MatchWalls(void)
 		std::vector<int> pointIdxNKNSearch(k);
 		std::vector<float> pointNKNSquaredDistance(k);
 		kdtree.setInputCloud(walls_now_rotated);
-		const double threshold_matching_distance = 0.3;
+		const double threshold_matching_distance = 0.4;
 		// std::vector<bool> list_matched(walls_last->points.size(), false);
 		std::vector<double> list_yawrate;
 		for(size_t i=0;i<walls_last->points.size();i++){
@@ -126,7 +126,7 @@ double YawEstimationWalls::ComputeYawRate(pcl::PointXYZ p_origin, pcl::PointXYZ 
 {
 	tf::Quaternion q1(p_origin.x, p_origin.y, p_origin.z, 1.0);
 	tf::Quaternion q2(p_target.x, p_target.y, p_target.z, 1.0);
-	tf::Quaternion relative_rotation = (pose_now*q2)*(pose_now*q1).inverse();
+	tf::Quaternion relative_rotation = (pose_last*q2)*(pose_last*q1).inverse();
 	relative_rotation.normalize();
 	double roll, pitch, yaw;
 	tf::Matrix3x3(relative_rotation).getRPY(roll, pitch, yaw);
