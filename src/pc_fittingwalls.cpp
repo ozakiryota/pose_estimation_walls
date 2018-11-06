@@ -132,8 +132,7 @@ void PCFittingWalls::NormalEstimation(void)
 		Eigen::Vector4f plane_parameters;
 		double laser_distance = sqrt(cloud->points[i].x*cloud->points[i].x + cloud->points[i].y*cloud->points[i].y + cloud->points[i].z*cloud->points[i].z);
 		const double search_radius_min = 0.5;
-		const double ratio = 0.09;
-		double search_radius = ratio*laser_distance;
+		const double ratio = 0.09;5		double search_radius = ratio*laser_distance;
 		if(search_radius<search_radius_min)	search_radius = search_radius_min;
 		indices = KdtreeSearch(cloud->points[i], search_radius);
 		/*compute normal*/
@@ -328,7 +327,8 @@ void PCFittingWalls::PointPreCluster(std::vector<int>& list_num_belongings)
 	const int k = 2;
 	kdtree.setInputCloud(gaussian_sphere_clustered);
 	const double threshold_merge_distance = 0.05;
-	std::vector<bool> list_point_need_to_be_erased(gaussian_sphere_clustered->points.size(), false);
+	// std::vector<bool> list_point_need_to_be_erased(gaussian_sphere_clustered->points.size(), false);
+	pcl::PointIndices::Ptr indices_need_to_be_erased (new pcl::PointIndices);
 	std::vector<bool> list_point_is_merged(gaussian_sphere_clustered->points.size(), false);
 	for(size_t i=0;i<gaussian_sphere_clustered->points.size();i++){
 		if(list_point_is_merged[i]) continue;
@@ -342,19 +342,26 @@ void PCFittingWalls::PointPreCluster(std::vector<int>& list_num_belongings)
 			list_point_is_merged[i] = true;
 			list_point_is_merged[pointIdxNKNSearch[1]] = true;
 			/*prepare for erasing*/
-			list_point_need_to_be_erased[pointIdxNKNSearch[1]] = true;
+			indices_need_to_be_erased->indices.push_back(pointIdxNKNSearch[1]);
+			// list_point_need_to_be_erased[pointIdxNKNSearch[1]] = true;
 		}
 	}
 	/*erase*/
-	int count_erase = 0;
-	for(size_t i=0;i<list_point_need_to_be_erased.size();i++){
-		if(list_point_need_to_be_erased[i]){
-			gaussian_sphere_clustered->points.erase(gaussian_sphere_clustered->points.begin() + i - count_erase);
-			list_num_belongings.erase(list_num_belongings.begin() + i - count_erase);
-			count_erase ++;
-		}
-	}
-	std::cout << "count_erase" << count_erase << std::endl;
+	// int count_erase = 0;
+	// for(size_t i=0;i<list_point_need_to_be_erased.size();i++){
+	// 	if(list_point_need_to_be_erased[i]){
+	// 		gaussian_sphere_clustered->points.erase(gaussian_sphere_clustered->points.begin() + i - count_erase);
+	// 		list_num_belongings.erase(list_num_belongings.begin() + i - count_erase);
+	// 		count_erase ++;
+	// 	}
+	// }
+	// std::cout << "count_erase" << count_erase << std::endl;
+	pcl::ExtractIndices<pcl::PointXYZ> ec;
+	ec.setInputCloud(gaussian_sphere_clustered);
+	ec.setIndices(indices_need_to_be_erased);
+	ec.setNegative(true);
+	ec.filter(*gaussian_sphere_clustered);
+	
 }
 
 pcl::PointXYZ PCFittingWalls::PointMerge(int index1, int index2, std::vector<int> list_num_belongings)
