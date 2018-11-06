@@ -268,9 +268,9 @@ void EKFPose::ObservationWalls(pcl::PointNormal g_vector)
 	  		atan2(-gx, sqrt(gy*gy + gz*gz)),
 			X(2, 0);
 	double yaw_walls;
-	if(YawEstimationWalls(yaw_walls))	Z <<	atan2(gy, gz),
-	  											atan2(-gx, sqrt(gy*gy + gz*gz)),
-												yaw_walls;
+	// if(YawEstimationWalls(yaw_walls))	Z <<	atan2(gy, gz),
+	//   											atan2(-gx, sqrt(gy*gy + gz*gz)),
+	// 											yaw_walls;
 	Eigen::MatrixXd H(num_obs, num_state);
 	H <<	1,	0,	0,
 			0,	1,	0,

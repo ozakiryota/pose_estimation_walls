@@ -288,7 +288,7 @@ void PCFittingWalls::PointCluster(void)
 		}
 	}
 	/*erase outlier*/
-	const int threshold_num_belongings = 25;
+	const int threshold_num_belongings = 30;
 	for(size_t i=0;i<list_num_belongings.size();i++){
 		if(list_num_belongings[i]<threshold_num_belongings){
 			gaussian_sphere_clustered->points.erase(gaussian_sphere_clustered->points.begin() + i);

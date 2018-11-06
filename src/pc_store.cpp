@@ -14,11 +14,13 @@ class PCStore{
 		/*subscribe*/
 		ros::Subscriber sub_pc;
 		ros::Subscriber sub_odom;
+		/*publish*/
+		ros::Publisher pub;
 		/*viewer*/
 		pcl::visualization::PCLVisualizer viewer{"pc_store"};
 		/*cloud*/
-		pcl::PointCloud<pcl::PointXYZ>::Ptr cloud_stored {new pcl::PointCloud<pcl::PointXYZ>};
-		pcl::PointCloud<pcl::PointXYZ>::Ptr cloud_now {new pcl::PointCloud<pcl::PointXYZ>};
+		pcl::PointCloud<pcl::PointXYZI>::Ptr cloud_stored {new pcl::PointCloud<pcl::PointXYZI>};
+		pcl::PointCloud<pcl::PointXYZI>::Ptr cloud_now {new pcl::PointCloud<pcl::PointXYZI>};
 		/*odom*/
 		nav_msgs::Odometry odom_now;
 		nav_msgs::Odometry odom_last;
@@ -36,12 +38,14 @@ class PCStore{
 		void CallbackOdom(const nav_msgs::OdometryConstPtr& msg);
 		Eigen::MatrixXd FrameRotation(geometry_msgs::Quaternion q, Eigen::MatrixXd X, bool from_global_to_local);
 		void Visualizer(void);
+		void Publisher(void);
 };
 
 PCStore::PCStore()
 {
 	sub_pc = nh.subscribe("/velodyne_points", 1, &PCStore::CallbackPC, this);
 	sub_odom = nh.subscribe("/combined_odometry", 1, &PCStore::CallbackOdom, this);
+	pub = nh.advertise<sensor_msgs::PointCloud2>("/velodyne_points/stored", 1);
 	viewer.setBackgroundColor(1, 1, 1);
 	viewer.addCoordinateSystem(0.5, "axis");
 }
@@ -50,6 +54,7 @@ void PCStore::CallbackPC(const sensor_msgs::PointCloud2ConstPtr &msg)
 {
 	// std::cout << "CALLBACK PC" << std::endl;
 	pcl::fromROSMsg(*msg, *cloud_now);
+	cloud_stored->header.frame_id = msg->header.frame_id;
 	pc_was_added = false;
 }
 
@@ -85,6 +90,9 @@ void PCStore::CallbackOdom(const nav_msgs::OdometryConstPtr& msg)
 				cloud_stored->points.erase(cloud_stored->points.begin(), cloud_stored->points.begin() + list_num_scanpoints[0]);
 				list_num_scanpoints.erase(list_num_scanpoints.begin());
 			}
+			cloud_stored->width = cloud_stored->points.size();
+			cloud_stored->height = 1;
+
 			std::cout << "limit storing: true" << std::endl;
 			std::cout << "number of stored scans: " << list_num_scanpoints.size() << std::endl;
 		}
@@ -92,6 +100,7 @@ void PCStore::CallbackOdom(const nav_msgs::OdometryConstPtr& msg)
 	first_callback_odom = false;
 
 	Visualizer();
+	Publisher();
 }
 
 Eigen::MatrixXd PCStore::FrameRotation(geometry_msgs::Quaternion q, Eigen::MatrixXd X, bool from_global_to_local)
@@ -108,11 +117,19 @@ Eigen::MatrixXd PCStore::FrameRotation(geometry_msgs::Quaternion q, Eigen::Matri
 void PCStore::Visualizer(void)
 {
 	viewer.removePointCloud("cloud");
-	viewer.addPointCloud(cloud_stored, "cloud");
+	viewer.addPointCloud<pcl::PointXYZI>(cloud_stored, "cloud");
 	viewer.setPointCloudRenderingProperties (pcl::visualization::PCL_VISUALIZER_COLOR, 0.0, 0.0, 0.0, "cloud");
 	viewer.setPointCloudRenderingProperties (pcl::visualization::PCL_VISUALIZER_POINT_SIZE, 1, "cloud");
 	
 	viewer.spinOnce();
+}
+
+void PCStore::Publisher(void)
+{
+	sensor_msgs::PointCloud2 ros_pc_out;
+	pcl::toROSMsg(*cloud_stored, ros_pc_out);
+	ros_pc_out.header.stamp = odom_now.header.stamp;
+	pub.publish(ros_pc_out);
 }
 
 int main(int argc, char** argv)
