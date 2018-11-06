@@ -116,9 +116,11 @@ Eigen::MatrixXd PCStore::FrameRotation(geometry_msgs::Quaternion q, Eigen::Matri
 
 void PCStore::Visualizer(void)
 {
-	viewer.removePointCloud("cloud");
-	viewer.addPointCloud<pcl::PointXYZI>(cloud_stored, "cloud");
-	viewer.setPointCloudRenderingProperties (pcl::visualization::PCL_VISUALIZER_COLOR, 0.0, 0.0, 0.0, "cloud");
+	viewer.removeAllPointClouds();
+
+	pcl::visualization::PointCloudColorHandlerGenericField<pcl::PointXYZI> intensity_distribution(cloud_stored, "intensity"); 
+	viewer.addPointCloud<pcl::PointXYZI>(cloud_stored, intensity_distribution, "cloud");
+	// viewer.setPointCloudRenderingProperties (pcl::visualization::PCL_VISUALIZER_COLOR, 0.0, 0.0, 0.0, "cloud");
 	viewer.setPointCloudRenderingProperties (pcl::visualization::PCL_VISUALIZER_POINT_SIZE, 1, "cloud");
 	
 	viewer.spinOnce();
