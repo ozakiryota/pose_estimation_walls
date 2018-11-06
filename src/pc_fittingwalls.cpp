@@ -6,6 +6,7 @@
 #include <pcl/visualization/cloud_viewer.h>
 #include <pcl/features/normal_3d.h>
 #include <pcl_conversions/pcl_conversions.h>
+#include <pcl/filters/extract_indices.h>
 
 class PCFittingWalls{
 	private:
@@ -132,7 +133,8 @@ void PCFittingWalls::NormalEstimation(void)
 		Eigen::Vector4f plane_parameters;
 		double laser_distance = sqrt(cloud->points[i].x*cloud->points[i].x + cloud->points[i].y*cloud->points[i].y + cloud->points[i].z*cloud->points[i].z);
 		const double search_radius_min = 0.5;
-		const double ratio = 0.09;5		double search_radius = ratio*laser_distance;
+		const double ratio = 0.09;
+		double search_radius = ratio*laser_distance;
 		if(search_radius<search_radius_min)	search_radius = search_radius_min;
 		indices = KdtreeSearch(cloud->points[i], search_radius);
 		/*compute normal*/
@@ -238,10 +240,10 @@ void PCFittingWalls::PointCluster(void)
 	
 	/*pre cluster*/
 	std::cout << "gaussian_sphere_clustered->points.size() = " << gaussian_sphere_clustered->points.size() << std::endl;
-	const int threshold_num_points_before_cluster = 250;
-	int num_times_precluster = gaussian_sphere_clustered->points.size()/threshold_num_points_before_cluster;
+	const int threshold_num_points_before_hierarchical_cluster = 250;
+	int num_times_precluster = gaussian_sphere_clustered->points.size()/threshold_num_points_before_hierarchical_cluster;
 	for(int i=0;i<num_times_precluster;i++){
-		if(gaussian_sphere_clustered->points.size()>threshold_num_points_before_cluster)	PointPreCluster(list_num_belongings);
+		if(gaussian_sphere_clustered->points.size()>threshold_num_points_before_hierarchical_cluster)	PointPreCluster(list_num_belongings);
 		else	break;
 	}
 	
@@ -327,8 +329,7 @@ void PCFittingWalls::PointPreCluster(std::vector<int>& list_num_belongings)
 	const int k = 2;
 	kdtree.setInputCloud(gaussian_sphere_clustered);
 	const double threshold_merge_distance = 0.05;
-	// std::vector<bool> list_point_need_to_be_erased(gaussian_sphere_clustered->points.size(), false);
-	pcl::PointIndices::Ptr indices_need_to_be_erased (new pcl::PointIndices);
+	std::vector<bool> list_point_need_to_be_erased(gaussian_sphere_clustered->points.size(), false);
 	std::vector<bool> list_point_is_merged(gaussian_sphere_clustered->points.size(), false);
 	for(size_t i=0;i<gaussian_sphere_clustered->points.size();i++){
 		if(list_point_is_merged[i]) continue;
@@ -338,30 +339,23 @@ void PCFittingWalls::PointPreCluster(std::vector<int>& list_num_belongings)
 		if(!list_point_is_merged[pointIdxNKNSearch[1]] && sqrt(pointNKNSquaredDistance[1])<threshold_merge_distance){
 			/*merge*/
 			gaussian_sphere_clustered->points[i] = PointMerge(i, pointIdxNKNSearch[1], list_num_belongings);
-			list_num_belongings[i] += list_num_belongings[pointIdxNKNSearch[1]];
+			// list_num_belongings[i] += list_num_belongings[pointIdxNKNSearch[1]];
 			list_point_is_merged[i] = true;
 			list_point_is_merged[pointIdxNKNSearch[1]] = true;
 			/*prepare for erasing*/
-			indices_need_to_be_erased->indices.push_back(pointIdxNKNSearch[1]);
-			// list_point_need_to_be_erased[pointIdxNKNSearch[1]] = true;
+			list_point_need_to_be_erased[pointIdxNKNSearch[1]] = true;
 		}
 	}
 	/*erase*/
-	// int count_erase = 0;
-	// for(size_t i=0;i<list_point_need_to_be_erased.size();i++){
-	// 	if(list_point_need_to_be_erased[i]){
-	// 		gaussian_sphere_clustered->points.erase(gaussian_sphere_clustered->points.begin() + i - count_erase);
-	// 		list_num_belongings.erase(list_num_belongings.begin() + i - count_erase);
-	// 		count_erase ++;
-	// 	}
-	// }
-	// std::cout << "count_erase" << count_erase << std::endl;
-	pcl::ExtractIndices<pcl::PointXYZ> ec;
-	ec.setInputCloud(gaussian_sphere_clustered);
-	ec.setIndices(indices_need_to_be_erased);
-	ec.setNegative(true);
-	ec.filter(*gaussian_sphere_clustered);
-	
+	int count_erase = 0;
+	for(size_t i=0;i<list_point_need_to_be_erased.size();i++){
+		if(list_point_need_to_be_erased[i]){
+			gaussian_sphere_clustered->points.erase(gaussian_sphere_clustered->points.begin() + i - count_erase);
+			list_num_belongings.erase(list_num_belongings.begin() + i - count_erase);
+			count_erase ++;
+		}
+	}
+	std::cout << "count_erase" << count_erase << std::endl;
 }
 
 pcl::PointXYZ PCFittingWalls::PointMerge(int index1, int index2, std::vector<int> list_num_belongings)
