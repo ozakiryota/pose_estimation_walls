@@ -22,14 +22,15 @@ class PCFittingWalls{
 		pcl::PointCloud<pcl::PointXYZ>::Ptr cloud {new pcl::PointCloud<pcl::PointXYZ>};
 		pcl::PointCloud<pcl::PointNormal>::Ptr normals {new pcl::PointCloud<pcl::PointNormal>};
 		pcl::PointCloud<pcl::PointNormal>::Ptr extracted_normals {new pcl::PointCloud<pcl::PointNormal>};
-		pcl::PointCloud<pcl::PointXYZ>::Ptr gaussian_sphere {new pcl::PointCloud<pcl::PointXYZ>};
-		pcl::PointCloud<pcl::PointXYZ>::Ptr gaussian_sphere_clustered {new pcl::PointCloud<pcl::PointXYZ>};
+		pcl::PointCloud<pcl::InterestPoint>::Ptr gaussian_sphere {new pcl::PointCloud<pcl::InterestPoint>};
+		pcl::PointCloud<pcl::InterestPoint>::Ptr gaussian_sphere_clustered {new pcl::PointCloud<pcl::InterestPoint>};
 		pcl::PointCloud<pcl::PointXYZ>::Ptr gaussian_sphere_clustered_weighted {new pcl::PointCloud<pcl::PointXYZ>};
 		pcl::PointCloud<pcl::PointNormal>::Ptr gaussian_sphere_clustered_n {new pcl::PointCloud<pcl::PointNormal>};	//just for the viewer
 		pcl::PointCloud<pcl::PointNormal>::Ptr g_vector_from_ekf {new pcl::PointCloud<pcl::PointNormal>};
 		pcl::PointCloud<pcl::PointNormal>::Ptr g_vector {new pcl::PointCloud<pcl::PointNormal>};
 		/*kdtree*/
-		pcl::KdTreeFLANN<pcl::PointXYZ> kdtree;
+		pcl::KdTreeFLANN<pcl::PointXYZ> kdtree_xyz;
+		pcl::KdTreeFLANN<pcl::InterestPoint> kdtree_xyzs;
 		/*flags*/
 		bool g_estimation_success;
 
@@ -44,8 +45,8 @@ class PCFittingWalls{
 		double AngleBetweenVectors(pcl::PointNormal v1, pcl::PointNormal v2);
 		double ComputeSquareError(Eigen::Vector4f plane_parameters, std::vector<int> indices);
 		void PointCluster(void);
-		void PointPreCluster(std::vector<int>& list_num_belongings);
-		pcl::PointXYZ PointMerge(int index1, int index2, std::vector<int> list_num_belongings);
+		void PointPreCluster(void);
+		pcl::InterestPoint PointMerge(int index1, int index2);
 		bool GVectorEstimation(void);
 		void PartialRotation(void);
 		void Visualizer(void);
@@ -123,7 +124,7 @@ void PCFittingWalls::ClearCloud(void)
 void PCFittingWalls::NormalEstimation(void)
 {
 	std::cout << "NORMAL ESTIMATION" << std::endl;
-	kdtree.setInputCloud(cloud);
+	kdtree_xyz.setInputCloud(cloud);
 
 	const size_t skip_step = 6;
 	for(size_t i=0;i<cloud->points.size();i+=skip_step){
@@ -183,10 +184,11 @@ void PCFittingWalls::NormalEstimation(void)
 		/*input*/
 		std::cout << ">> ok, then input" << std::endl;
 		extracted_normals->points.push_back(tmp_normal);
-		pcl::PointXYZ tmp_point;
+		pcl::InterestPoint tmp_point;
 		tmp_point.x = plane_parameters[0];
 		tmp_point.y = plane_parameters[1];
 		tmp_point.z = plane_parameters[2];
+		tmp_point.strength = 1;
 		gaussian_sphere->points.push_back(tmp_point);
 	}
 }
@@ -196,7 +198,7 @@ std::vector<int> PCFittingWalls::KdtreeSearch(pcl::PointXYZ searchpoint, double 
 	std::cout << "KDTREE SEARCH" << std::endl;
 	std::vector<int> pointIdxRadiusSearch;
 	std::vector<float> pointRadiusSquaredDistance;
-	if(kdtree.radiusSearch(searchpoint, search_radius, pointIdxRadiusSearch, pointRadiusSquaredDistance)<=0)	std::cout << "kdtree error" << std::endl;
+	if(kdtree_xyz.radiusSearch(searchpoint, search_radius, pointIdxRadiusSearch, pointRadiusSquaredDistance)<=0)	std::cout << "kdtree error" << std::endl;
 	return pointIdxRadiusSearch; 
 }
 
@@ -235,15 +237,14 @@ void PCFittingWalls::PointCluster(void)
 {
 	std::cout << "POINT CLUSTER" << std::endl;
 	const int k = 2;
-	*gaussian_sphere_clustered = *gaussian_sphere;
-	std::vector<int> list_num_belongings(gaussian_sphere_clustered->points.size(), 1);
+	pcl::copyPointCloud(*gaussian_sphere, *gaussian_sphere_clustered);
 	
 	/*pre cluster*/
 	std::cout << "gaussian_sphere_clustered->points.size() = " << gaussian_sphere_clustered->points.size() << std::endl;
 	const int threshold_num_points_before_hierarchical_cluster = 250;
 	int num_times_precluster = gaussian_sphere_clustered->points.size()/threshold_num_points_before_hierarchical_cluster;
 	for(int i=0;i<num_times_precluster;i++){
-		if(gaussian_sphere_clustered->points.size()>threshold_num_points_before_hierarchical_cluster)	PointPreCluster(list_num_belongings);
+		if(gaussian_sphere_clustered->points.size()>threshold_num_points_before_hierarchical_cluster)	PointPreCluster();
 		else	break;
 	}
 	
@@ -258,10 +259,8 @@ void PCFittingWalls::PointCluster(void)
 		for(size_t i=0;i<gaussian_sphere_clustered->points.size();i++){
 			std::vector<int> pointIdxNKNSearch(k);
 			std::vector<float> pointNKNSquaredDistance(k);
-			kdtree.setInputCloud(gaussian_sphere_clustered);
-			if(kdtree.nearestKSearch(gaussian_sphere_clustered->points[i], k, pointIdxNKNSearch, pointNKNSquaredDistance)<=0)	std::cout << "kdtree error" << std::endl;
-			// std::cout << "pointNKNSquaredDistance[1] = " << pointNKNSquaredDistance[1] << std::endl;
-			// std::cout << "sqrt(pointNKNSquaredDistance[1]) = " << sqrt(pointNKNSquaredDistance[1]) << std::endl;
+			kdtree_xyzs.setInputCloud(gaussian_sphere_clustered);
+			if(kdtree_xyzs.nearestKSearch(gaussian_sphere_clustered->points[i], k, pointIdxNKNSearch, pointNKNSquaredDistance)<=0)	std::cout << "kdtree error" << std::endl;
 			if(i==0){
 				shortest_distance = pointNKNSquaredDistance[1];
 				merge_pair_indices[0] = i;
@@ -280,20 +279,16 @@ void PCFittingWalls::PointCluster(void)
 		}
 		else{
 			/*merge*/
-			gaussian_sphere_clustered->points[merge_pair_indices[0]] = PointMerge(merge_pair_indices[0], merge_pair_indices[1], list_num_belongings);
-			list_num_belongings[merge_pair_indices[0]] += list_num_belongings[merge_pair_indices[1]];
+			gaussian_sphere_clustered->points[merge_pair_indices[0]] = PointMerge(merge_pair_indices[0], merge_pair_indices[1]);
 			/*erase*/
 			gaussian_sphere_clustered->points.erase(gaussian_sphere_clustered->points.begin() + merge_pair_indices[1]);
-			list_num_belongings.erase(list_num_belongings.begin() + merge_pair_indices[1]);
 		}
 	}
 	/*erase outlier*/
 	const int threshold_num_belongings = 30;
-	for(size_t i=0;i<list_num_belongings.size();i++){
-		if(list_num_belongings[i]<threshold_num_belongings){
+	for(size_t i=0;i<gaussian_sphere_clustered->points.size();i++){
+		if(gaussian_sphere_clustered->points[i].strength<threshold_num_belongings){
 			gaussian_sphere_clustered->points.erase(gaussian_sphere_clustered->points.begin() + i);
-			list_num_belongings.erase(list_num_belongings.begin() + i);
-
 			i--;
 		}
 		else{
@@ -316,55 +311,54 @@ void PCFittingWalls::PointCluster(void)
 	/*give weight*/
 	for(size_t i=0;i<gaussian_sphere_clustered->points.size();i++){
 		pcl::PointXYZ tmp_point;
-		tmp_point.x = list_num_belongings[i]*gaussian_sphere_clustered->points[i].x;
-		tmp_point.y = list_num_belongings[i]*gaussian_sphere_clustered->points[i].y;
-		tmp_point.z = list_num_belongings[i]*gaussian_sphere_clustered->points[i].z;
+		tmp_point.x = gaussian_sphere_clustered->points[i].strength*gaussian_sphere_clustered->points[i].x;
+		tmp_point.y = gaussian_sphere_clustered->points[i].strength*gaussian_sphere_clustered->points[i].y;
+		tmp_point.z = gaussian_sphere_clustered->points[i].strength*gaussian_sphere_clustered->points[i].z;
 		gaussian_sphere_clustered_weighted->points.push_back(tmp_point);
 	}
 }
 
-void PCFittingWalls::PointPreCluster(std::vector<int>& list_num_belongings)
+void PCFittingWalls::PointPreCluster(void)
 {
 	std::cout << "POINT PRE CLUSTER" << std::endl;
 	const int k = 2;
-	kdtree.setInputCloud(gaussian_sphere_clustered);
+	kdtree_xyzs.setInputCloud(gaussian_sphere_clustered);
 	const double threshold_merge_distance = 0.05;
-	std::vector<bool> list_point_need_to_be_erased(gaussian_sphere_clustered->points.size(), false);
 	std::vector<bool> list_point_is_merged(gaussian_sphere_clustered->points.size(), false);
+	pcl::PointIndices::Ptr indices_to_be_erased (new pcl::PointIndices);
 	for(size_t i=0;i<gaussian_sphere_clustered->points.size();i++){
 		if(list_point_is_merged[i]) continue;
 		std::vector<int> pointIdxNKNSearch(k);
 		std::vector<float> pointNKNSquaredDistance(k);
-		if(kdtree.nearestKSearch(gaussian_sphere_clustered->points[i], k, pointIdxNKNSearch, pointNKNSquaredDistance)<=0)	std::cout << "kdtree error" << std::endl;
+		if(kdtree_xyzs.nearestKSearch(gaussian_sphere_clustered->points[i], k, pointIdxNKNSearch, pointNKNSquaredDistance)<=0)	std::cout << "kdtree error" << std::endl;
 		if(!list_point_is_merged[pointIdxNKNSearch[1]] && sqrt(pointNKNSquaredDistance[1])<threshold_merge_distance){
 			/*merge*/
-			gaussian_sphere_clustered->points[i] = PointMerge(i, pointIdxNKNSearch[1], list_num_belongings);
-			// list_num_belongings[i] += list_num_belongings[pointIdxNKNSearch[1]];
+			gaussian_sphere_clustered->points[i] = PointMerge(i, pointIdxNKNSearch[1]);
 			list_point_is_merged[i] = true;
 			list_point_is_merged[pointIdxNKNSearch[1]] = true;
 			/*prepare for erasing*/
-			list_point_need_to_be_erased[pointIdxNKNSearch[1]] = true;
+			indices_to_be_erased->indices.push_back(pointIdxNKNSearch[1]);
 		}
 	}
 	/*erase*/
-	int count_erase = 0;
-	for(size_t i=0;i<list_point_need_to_be_erased.size();i++){
-		if(list_point_need_to_be_erased[i]){
-			gaussian_sphere_clustered->points.erase(gaussian_sphere_clustered->points.begin() + i - count_erase);
-			list_num_belongings.erase(list_num_belongings.begin() + i - count_erase);
-			count_erase ++;
-		}
-	}
-	std::cout << "count_erase" << count_erase << std::endl;
+	pcl::ExtractIndices<pcl::InterestPoint> ec;
+	ec.setInputCloud(gaussian_sphere_clustered);
+	ec.setIndices(indices_to_be_erased);
+	ec.setNegative(true);
+	ec.filter(*gaussian_sphere_clustered);
+	std::cout << "indices_to_be_erased->indices.size() = " << indices_to_be_erased->indices.size() << std::endl;
 }
 
-pcl::PointXYZ PCFittingWalls::PointMerge(int index1, int index2, std::vector<int> list_num_belongings)
+pcl::InterestPoint PCFittingWalls::PointMerge(int index1, int index2)
 {
 	std::cout << "POINT MERGE" << std::endl;
-	pcl::PointXYZ p;
-	p.x = (list_num_belongings[index1]*gaussian_sphere_clustered->points[index1].x + list_num_belongings[index2]*gaussian_sphere_clustered->points[index2].x)/(list_num_belongings[index1] + list_num_belongings[index2]);
-	p.y = (list_num_belongings[index1]*gaussian_sphere_clustered->points[index1].y + list_num_belongings[index2]*gaussian_sphere_clustered->points[index2].y)/(list_num_belongings[index1] + list_num_belongings[index2]);
-	p.z = (list_num_belongings[index1]*gaussian_sphere_clustered->points[index1].z + list_num_belongings[index2]*gaussian_sphere_clustered->points[index2].z)/(list_num_belongings[index1] + list_num_belongings[index2]);
+	pcl::InterestPoint p;
+	pcl::InterestPoint p1 = gaussian_sphere_clustered->points[index1];
+	pcl::InterestPoint p2 = gaussian_sphere_clustered->points[index2];
+	p.x = (p1.strength*p1.x + p2.strength*p2.x)/(p1.strength + p2.strength);
+	p.y = (p1.strength*p1.y + p2.strength*p2.y)/(p1.strength + p2.strength);
+	p.z = (p1.strength*p1.z + p2.strength*p2.z)/(p1.strength + p2.strength);
+	p.strength = p1.strength + p2.strength;	//number of points that belong
 	return p;
 }
 
@@ -441,7 +435,7 @@ void PCFittingWalls::Visualizer(void)
 	viewer.setPointCloudRenderingProperties (pcl::visualization::PCL_VISUALIZER_COLOR, 0.0, 1.0, 1.0, "extracted_normals");
 	viewer.setPointCloudRenderingProperties (pcl::visualization::PCL_VISUALIZER_LINE_WIDTH, 3, "extracted_normals");
 
-	viewer.addPointCloud(gaussian_sphere, "gaussian_sphere");
+	viewer.addPointCloud<pcl::InterestPoint>(gaussian_sphere, "gaussian_sphere");
 	viewer.setPointCloudRenderingProperties (pcl::visualization::PCL_VISUALIZER_COLOR, 1.0, 0.0, 0.0, "gaussian_sphere");
 	viewer.setPointCloudRenderingProperties (pcl::visualization::PCL_VISUALIZER_POINT_SIZE, 3, "gaussian_sphere");
 
