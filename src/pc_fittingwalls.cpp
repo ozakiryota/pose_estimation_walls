@@ -25,7 +25,7 @@ class PCFittingWalls{
 		pcl::PointCloud<pcl::InterestPoint>::Ptr gaussian_sphere {new pcl::PointCloud<pcl::InterestPoint>};
 		pcl::PointCloud<pcl::InterestPoint>::Ptr gaussian_sphere_clustered {new pcl::PointCloud<pcl::InterestPoint>};
 		pcl::PointCloud<pcl::PointXYZ>::Ptr gaussian_sphere_clustered_weighted {new pcl::PointCloud<pcl::PointXYZ>};
-		pcl::PointCloud<pcl::PointNormal>::Ptr gaussian_sphere_clustered_n {new pcl::PointCloud<pcl::PointNormal>};	//just for the viewer
+		pcl::PointCloud<pcl::PointNormal>::Ptr gaussian_sphere_clustered_n {new pcl::PointCloud<pcl::PointNormal>};	//just for vizualizing
 		pcl::PointCloud<pcl::PointNormal>::Ptr g_vector_from_ekf {new pcl::PointCloud<pcl::PointNormal>};
 		pcl::PointCloud<pcl::PointNormal>::Ptr g_vector {new pcl::PointCloud<pcl::PointNormal>};
 		/*kdtree*/
@@ -453,12 +453,29 @@ void PCFittingWalls::Visualizer(void)
 void PCFittingWalls::Publisher()
 {
 	std::cout << "PUBLISHER" << std::endl;
+	// if(g_estimation_success){
+	// 	pcl::PointCloud<pcl::PointNormal>::Ptr g_and_walls (new pcl::PointCloud<pcl::PointNormal>);
+	// 	g_and_walls->header = cloud->header;
+	// 	g_and_walls->points.push_back(g_vector->points[0]);
+	// 	for(size_t i=0;i<gaussian_sphere_clustered_n->points.size();i++){
+	// 		g_and_walls->points.push_back(gaussian_sphere_clustered_n->points[i]);	//points[0]:gravity, points[1~]:wall_normals
+	// 	}
+	// 	sensor_msgs::PointCloud2 ros_g_and_normals;
+	// 	pcl::toROSMsg(*g_and_walls, ros_g_and_normals);
+	// 	pub.publish(ros_g_and_normals);
+	// }
 	if(g_estimation_success){
-		pcl::PointCloud<pcl::PointNormal>::Ptr g_and_walls (new pcl::PointCloud<pcl::PointNormal>);
+		pcl::PointCloud<pcl::InterestPoint>::Ptr g_and_walls (new pcl::PointCloud<pcl::InterestPoint>);	//points[0]:gravity, points[1~]:wall_normals
 		g_and_walls->header = cloud->header;
-		g_and_walls->points.push_back(g_vector->points[0]);
-		for(size_t i=0;i<gaussian_sphere_clustered_n->points.size();i++){
-			g_and_walls->points.push_back(gaussian_sphere_clustered_n->points[i]);	//points[0]:gravity, points[1~]:wall_normals
+		pcl::InterestPoint g;
+		g.x = g_vector->points[0].normal_x;
+		g.y = g_vector->points[0].normal_y;
+		g.z = g_vector->points[0].normal_z;
+		g.strength = 0;
+		g_and_walls->points.push_back(g);
+		for(size_t i=0;i<gaussian_sphere_clustered->points.size();i++){
+			g_and_walls->points.push_back(gaussian_sphere_clustered->points[i]);
+			g_and_walls->points[0].strength += gaussian_sphere_clustered->points[i].strength;
 		}
 		sensor_msgs::PointCloud2 ros_g_and_normals;
 		pcl::toROSMsg(*g_and_walls, ros_g_and_normals);

@@ -1,6 +1,6 @@
 <launch>
 	<param name="use_sim_time" value="true"/>
-	
+
 	<node pkg="rosbag" type="play" name="player" args="--clock /home/amsl/ozaki/bagfiles/velodyne_realsense/2018-10-06-12-14-59.bag"/>
 
 	<node pkg="rviz" type="rviz" name="rviz" args="-d /home/amsl/.rviz/velodyne.rviz"/>
