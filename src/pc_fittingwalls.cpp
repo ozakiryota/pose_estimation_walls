@@ -172,7 +172,7 @@ void PCFittingWalls::NormalEstimation(void)
 			continue;
 		}
 		/*judge*/
-		const double threshold_square_error = 0.0001;
+		const double threshold_square_error = 0.01;
 		if(ComputeSquareError(plane_parameters, indices)>threshold_square_error){
 			std::cout << ">> square error = " << ComputeSquareError(plane_parameters, indices) << " > " << threshold_square_error << ", then skip" << std::endl;
 			continue;
@@ -218,17 +218,13 @@ double PCFittingWalls::ComputeSquareError(Eigen::Vector4f plane_parameters, std:
 	std::cout << "COMPUTE SQUARE ERROR" << std::endl;
 	double sum_square_error = 0.0;
 	for(size_t i=0;i<indices.size();i++){
-		double square_error =	(plane_parameters[0]*cloud->points[indices[i]].x
-								+plane_parameters[1]*cloud->points[indices[i]].y
-								+plane_parameters[2]*cloud->points[indices[i]].z
-								+plane_parameters[3])
-								*(plane_parameters[0]*cloud->points[indices[i]].x
-								+plane_parameters[1]*cloud->points[indices[i]].y
-								+plane_parameters[2]*cloud->points[indices[i]].z
-								+plane_parameters[3])
-								/(plane_parameters[0]*plane_parameters[0]
-								+plane_parameters[1]*plane_parameters[1]
-								+plane_parameters[2]*plane_parameters[2]);
+		double square_error =	fabs(plane_parameters[0]*cloud->points[indices[i]].x
+									+plane_parameters[1]*cloud->points[indices[i]].y
+									+plane_parameters[2]*cloud->points[indices[i]].z
+									+plane_parameters[3])
+								/sqrt(plane_parameters[0]*plane_parameters[0]
+									+plane_parameters[1]*plane_parameters[1]
+									+plane_parameters[2]*plane_parameters[2]);
 		sum_square_error += square_error/(double)indices.size();
 	}
 	return sum_square_error;

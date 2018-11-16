@@ -7,6 +7,7 @@
 #include <pcl/point_types.h>
 #include <pcl/kdtree/kdtree_flann.h>
 #include <pcl/features/normal_3d.h>
+#include <pcl/segmentation/extract_clusters.h>
 #include <pcl/common/transforms.h>
 #include <pcl/visualization/cloud_viewer.h>
 #include <tf/tf.h>
@@ -64,6 +65,7 @@ void YawEstimationWalls::CallbackPC(const sensor_msgs::PointCloud2ConstPtr &msg)
 	pcl::fromROSMsg(*msg, *cloud);
 	ClearCloud();
 	NormalEstimation();
+	PointCluster();
 	Visualization();
 }
 
@@ -164,6 +166,16 @@ double YawEstimationWalls::ComputeSquareError(Eigen::Vector4f plane_parameters, 
 
 void YawEstimationWalls::PointCluster(void)
 {
+	pcl::search::KdTree<pcl::PointXYZ>::Ptr tree (new pcl::search::KdTree<pcl::PointXYZ>);
+	tree->setInputCloud(d_gauss);
+	std::vector<pcl::PointIndices> cluster_indices;
+	pcl::EuclideanClusterExtraction<pcl::PointXYZ> ec;
+	ec.setClusterTolerance (0.01);	//[m]
+	ec.setMinClusterSize (30);
+	ec.setMaxClusterSize (d_gauss->points.size());
+	ec.setSearchMethod(tree);
+	ec.setInputCloud(d_gauss);
+	ec.extract(cluster_indices);
 }
 
 void YawEstimationWalls::Visualization(void)
