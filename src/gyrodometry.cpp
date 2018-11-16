@@ -100,7 +100,13 @@ void Gyrodometry::CallbackOdom(const nav_msgs::OdometryConstPtr& msg)
 void Gyrodometry::CallbackIMU(const sensor_msgs::ImuConstPtr& msg)
 {
 	time_now_imu = ros::Time::now();
-	double dt = (time_now_imu - time_last_imu).toSec();
+	double dt;
+	try{
+		dt = (time_now_imu - time_last_imu).toSec();
+	}
+	catch(std::runtime_error& ex) {
+		ROS_ERROR("Exception: [%s]", ex.what());
+	}
 	time_last_imu = time_now_imu;
 	if(first_callback_imu){
 		dt = 0.0;

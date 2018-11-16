@@ -58,7 +58,7 @@ class EKFPose{
 		void CallbackWalls(const sensor_msgs::PointCloud2ConstPtr& msg);
 		// void ObservationWalls(pcl::PointNormal g_vector);
 		void ObservationWalls(pcl::InterestPoint g_vector);
-		bool YawEstimationWalls(double& yaw_walls);
+		bool YawEstimationWalls(double& yaw_walls, double& strength_sum);
 		void Publisher();
 };
 
@@ -99,7 +99,13 @@ void EKFPose::CallbackBias(const sensor_msgs::ImuConstPtr& msg)
 void EKFPose::CallbackIMU(const sensor_msgs::ImuConstPtr& msg)
 {
 	time_imu_now = ros::Time::now();
-	double dt = (time_imu_now - time_imu_last).toSec();
+	double dt;
+	try{
+		dt = (time_imu_now - time_imu_last).toSec();
+	}
+	catch(std::runtime_error& ex) {
+		ROS_ERROR("Exception: [%s]", ex.what());
+	}
 	time_imu_last = time_imu_now;
 	if(first_callback_imu)	dt = 0.0;
 	else if(inipose_is_available)	PredictionIMU(*msg, dt);
@@ -290,8 +296,6 @@ void EKFPose::ObservationWalls(pcl::InterestPoint g_vector)
 	Z <<	atan2(gy, gz),
 	  		atan2(-gx, sqrt(gy*gy + gz*gz)),
 			X(2, 0);
-	double yaw_walls;
-	if(YawEstimationWalls(yaw_walls))	Z(2, 0) = yaw_walls;
 	Eigen::MatrixXd H(num_obs, num_state);
 	H <<	1,	0,	0,
 			0,	1,	0,
@@ -310,6 +314,13 @@ void EKFPose::ObservationWalls(pcl::InterestPoint g_vector)
 	Eigen::MatrixXd S(num_obs, num_obs);
 	Eigen::MatrixXd K(num_state, num_obs);
 	Eigen::MatrixXd I = Eigen::MatrixXd::Identity(num_state, num_state);
+	/*yaw estimation*/
+	double yaw_walls;
+	double strength_sum = 0.0;
+	if(YawEstimationWalls(yaw_walls, strength_sum)){
+		Z(2, 0) = yaw_walls;
+		R(2, 2) = 1.0/strength_sum*1.0e+2;
+	}
 
 	Y = Z - H*X;
 	// for(int i=0;i<num_obs;i++)	Y(i, 0) = atan2(sin(Y(i, 0)), cos(Y(i, 0)));
@@ -336,7 +347,7 @@ void EKFPose::ObservationWalls(pcl::InterestPoint g_vector)
 	q_pose = tf::createQuaternionFromRPY(X(0, 0), X(1, 0), X(2, 0));
 }
 
-bool EKFPose::YawEstimationWalls(double& yaw_walls)
+bool EKFPose::YawEstimationWalls(double& yaw_walls, double& strength_sum)
 {
 	if(walls_last->points.empty()){
 		*walls_last = *walls_now;
@@ -358,7 +369,7 @@ bool EKFPose::YawEstimationWalls(double& yaw_walls)
 		std::vector<int> pointIdxNKNSearch(k);
 		std::vector<float> pointNKNSquaredDistance(k);
 		kdtree.setInputCloud(walls_now_rotated);
-		const double threshold_matching_distance = 0.4;
+		const double threshold_matching_distance = 0.5;
 		std::vector<double> list_yawrate;
 		std::vector<double> list_strength;
 		for(size_t i=0;i<walls_last->points.size();i++){
@@ -379,12 +390,11 @@ bool EKFPose::YawEstimationWalls(double& yaw_walls)
 				double roll_rate, pitch_rate, yaw_rate;
 				tf::Matrix3x3(relative_rotation_).getRPY(roll_rate, pitch_rate, yaw_rate);
 				list_yawrate.push_back(yaw_rate);
-				list_strength.push_back(walls_now->points[pointIdxNKNSearch[0]].strength + walls_last->points[i].x);
+				list_strength.push_back(walls_now->points[pointIdxNKNSearch[0]].strength + walls_last->points[i].strength);
 			}
 		}
 		if(!list_yawrate.empty()){
 			double yawrate_ave = 0.0;
-			double strength_sum = 0.0;
 			// for(size_t i=0;i<list_yawrate.size();i++)	yawrate_ave += list_yawrate[i]/(double)list_yawrate.size();
 			for(size_t i=0;i<list_yawrate.size();i++){
 				yawrate_ave += list_strength[i]*list_yawrate[i];
@@ -392,6 +402,7 @@ bool EKFPose::YawEstimationWalls(double& yaw_walls)
 			}
 			yawrate_ave /= strength_sum;
 			std::cout << "estimated yaw with walls" << std::endl;
+			std::cout << "strength_sum = " << strength_sum << std::endl;
 			double roll, pitch, yaw;
 			tf::Matrix3x3(q_pose_last_at_wallscall).getRPY(roll, pitch, yaw);
 			yaw_walls = atan2(sin(yaw + yawrate_ave), cos(yaw + yawrate_ave));

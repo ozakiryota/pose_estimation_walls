@@ -47,7 +47,13 @@ ImuInitialAlignment::ImuInitialAlignment()
 void ImuInitialAlignment::Callback(const sensor_msgs::ImuConstPtr& msg)
 {
 	if(!initial_algnment_is_done){
-		double time = (ros::Time::now() - time_started).toSec();
+		double time;
+		try{
+			time = (ros::Time::now() - time_started).toSec();
+		}
+		catch(std::runtime_error& ex) {
+			ROS_ERROR("Exception: [%s]", ex.what());
+		}
 		if(record.size()==0){
 			time = 0.0;
 			time_started = ros::Time::now();
@@ -59,7 +65,7 @@ void ImuInitialAlignment::Callback(const sensor_msgs::ImuConstPtr& msg)
 			tf::Quaternion q = tf::createQuaternionFromRPY(X(0, 0), X(1, 0), X(2, 0));
 			quaternionTFToMsg(q, initial_pose);
 			if(time>timelimit)	std::cout << "time > " << timelimit << "[s]" << std::endl;
-			else	std::cout << "Moved at" << time << "[s]" << std::endl;
+			else	std::cout << "Moved at " << time << "[s]" << std::endl;
 			std::cout << "initial pose = " << std::endl << X << std::endl;
 			std::cout << "bias = " << std::endl << average.angular_velocity.x << std::endl << average.angular_velocity.y << std::endl << average.angular_velocity.z << std::endl;
 		}

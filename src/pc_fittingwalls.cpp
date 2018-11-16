@@ -126,7 +126,7 @@ void PCFittingWalls::NormalEstimation(void)
 	std::cout << "NORMAL ESTIMATION" << std::endl;
 	kdtree_xyz.setInputCloud(cloud);
 
-	const size_t skip_step = 6;
+	const size_t skip_step = 5;
 	for(size_t i=0;i<cloud->points.size();i+=skip_step){
 		/*search neighbor points*/
 		std::vector<int> indices;
@@ -171,6 +171,7 @@ void PCFittingWalls::NormalEstimation(void)
 			std::cout << ">> angle from square angle = " << fabs(AngleBetweenVectors(tmp_normal, g_vector_from_ekf->points[0])-M_PI/2.0) << " > " << threshold_angle << ", then skip" << std::endl;
 			continue;
 		}
+		/*judge*/
 		const double threshold_square_error = 0.0001;
 		if(ComputeSquareError(plane_parameters, indices)>threshold_square_error){
 			std::cout << ">> square error = " << ComputeSquareError(plane_parameters, indices) << " > " << threshold_square_error << ", then skip" << std::endl;
@@ -389,6 +390,8 @@ bool PCFittingWalls::GVectorEstimation(void)
 		g_vector->points[0].normal_y = plane_parameters[1];
 		g_vector->points[0].normal_z = plane_parameters[2];
 	}
+	/*flip*/
+	flipNormalTowardsViewpoint(g_vector->points[0], 0.0, 0.0, -100.0, g_vector->points[0].normal_x, g_vector->points[0].normal_y, g_vector->points[0].normal_z);
 	/*if angle variation is too large, estimation would be wrong*/
 	const double threshold_angle_variation = 60.0;	//[deg]
 	if(fabs(AngleBetweenVectors(g_vector->points[0], g_vector_from_ekf->points[0]))>threshold_angle_variation/180.0*M_PI){
@@ -400,8 +403,6 @@ bool PCFittingWalls::GVectorEstimation(void)
 	g_vector->points[0].normal_x /= norm_g;
 	g_vector->points[0].normal_y /= norm_g;
 	g_vector->points[0].normal_z /= norm_g;
-	/*flip*/
-	flipNormalTowardsViewpoint(g_vector->points[0], 0.0, 0.0, -100.0, g_vector->points[0].normal_x, g_vector->points[0].normal_y, g_vector->points[0].normal_z);
 	return true;
 }
 

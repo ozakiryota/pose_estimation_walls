@@ -212,6 +212,8 @@ add_executable(odom_creater_for_loamvelodyne src/odom_creater_for_loamvelodyne.c
 target_link_libraries(odom_creater_for_loamvelodyne ${catkin_LIBRARIES})
 add_executable(odom_creater_for_lsdslam src/odom_creater_for_lsdslam.cpp)
 target_link_libraries(odom_creater_for_lsdslam ${catkin_LIBRARIES})
+add_executable(yaw_estimation_walls_old_ver src/yaw_estimation_walls_old_ver.cpp)
+target_link_libraries(yaw_estimation_walls_old_ver ${catkin_LIBRARIES})
 add_executable(yaw_estimation_walls src/yaw_estimation_walls.cpp)
 target_link_libraries(yaw_estimation_walls ${catkin_LIBRARIES})
 add_executable(pc_store src/pc_store.cpp)

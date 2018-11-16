@@ -1,12 +1,13 @@
 #include <ros/ros.h>
 #include <sensor_msgs/PointCloud2.h>
+#include <nav_msgs/Odometry.h>
 #include <geometry_msgs/PoseStamped.h>
-#include <std_msgs/Float64.h>
 #include <pcl_conversions/pcl_conversions.h>
 #include <pcl/point_cloud.h>
 #include <pcl/point_types.h>
-#include <pcl/common/transforms.h>
 #include <pcl/kdtree/kdtree_flann.h>
+#include <pcl/features/normal_3d.h>
+#include <pcl/common/transforms.h>
 #include <pcl/visualization/cloud_viewer.h>
 #include <tf/tf.h>
 
@@ -14,144 +15,173 @@ class YawEstimationWalls{
 	private:
 		ros::NodeHandle nh;
 		/*subscribe*/
-		ros::Subscriber sub_walls;
-		ros::Subscriber sub_pose;
+		ros::Subscriber sub_pc;
+		ros::Subscriber sub_odom;
 		/*publish*/
-		ros::Publisher pub;
-		/*pc*/
-		pcl::PointCloud<pcl::InterestPoint>::Ptr walls_now {new pcl::PointCloud<pcl::InterestPoint>};
-		pcl::PointCloud<pcl::InterestPoint>::Ptr walls_now_rotated {new pcl::PointCloud<pcl::InterestPoint>};
-		pcl::PointCloud<pcl::InterestPoint>::Ptr walls_last {new pcl::PointCloud<pcl::InterestPoint>};
-		/*poses*/
-		tf::Quaternion pose_now;
-		tf::Quaternion pose_last;
+		ros::Publisher pub_pose;
+		/*struct*/
+		struct WallInfo{
+			pcl::PointXYZ point;
+			nav_msgs::Odometry odom;
+			Eigen::MatrixXd X;
+			Eigen::MatrixXd P;
+			int count_nomatch;
+		};
+		/*pcl*/
+		pcl::visualization::PCLVisualizer viewer{"d-gaussian sphere"};
+		pcl::PointCloud<pcl::PointXYZ>::Ptr cloud {new pcl::PointCloud<pcl::PointXYZ>};
+		pcl::PointCloud<pcl::PointNormal>::Ptr normals {new pcl::PointCloud<pcl::PointNormal>};
+		pcl::PointCloud<pcl::PointXYZ>::Ptr d_gauss {new pcl::PointCloud<pcl::PointXYZ>};
+		pcl::KdTreeFLANN<pcl::PointXYZ> kdtree;
+		/*objects*/
+		std::vector<WallInfo> list_walls;
+		nav_msgs::Odometry odom_now;
 		/*flags*/
-		bool first_callback_pose = true;
-		/*viewer*/
-		pcl::visualization::PCLVisualizer viewer{"pc_walls"};
+		bool first_callback_odom = true;
 	public:
 		YawEstimationWalls();
-		void CallbackPose(const geometry_msgs::PoseStampedConstPtr &msg);
-		void CallbackNormals(const sensor_msgs::PointCloud2ConstPtr &msg);
-		void MatchWalls(void);
-		double ComputeYawRate(pcl::InterestPoint p1, pcl::InterestPoint p2);
-		void Visualizer(void);
+		void CallbackPC(const sensor_msgs::PointCloud2ConstPtr &msg);
+		void CallbackOdom(const nav_msgs::OdometryConstPtr& msg);
+		void ClearCloud(void);
+		void NormalEstimation(void);
+		std::vector<int> KdtreeSearch(pcl::PointXYZ searchpoint, double search_radius);
+		double ComputeSquareError(Eigen::Vector4f plane_parameters, std::vector<int> indices);
+		void PointCluster(void);
+		void Visualization(void);
 };
 
 YawEstimationWalls::YawEstimationWalls()
 {
-	sub_walls = nh.subscribe("/g_and_walls", 1, &YawEstimationWalls::CallbackNormals, this);
-	sub_pose = nh.subscribe("/pose_ekf", 1, &YawEstimationWalls::CallbackPose, this);
-	pub = nh.advertise<std_msgs::Float64>("/yaw_rate_walls", 1);
+	sub_pc = nh.subscribe("/velodyne_points", 1, &YawEstimationWalls::CallbackPC, this);
+	sub_odom = nh.subscribe("/gyrodometry", 1, &YawEstimationWalls::CallbackOdom, this);
+	pub_pose = nh.advertise<geometry_msgs::PoseStamped>("/pose", 1);
 	viewer.setBackgroundColor(1, 1, 1);
-	viewer.addCoordinateSystem(0.2, "axis");
+	viewer.addCoordinateSystem(0.5, "axis");
 }
 
-void YawEstimationWalls::CallbackPose(const geometry_msgs::PoseStampedConstPtr &msg)
+void YawEstimationWalls::CallbackPC(const sensor_msgs::PointCloud2ConstPtr &msg)
 {
-	// std::cout << "CALLBACK POSE" << std::endl;
-	quaternionMsgToTF(msg->pose.orientation, pose_now);
-	if(first_callback_pose)	pose_last = pose_now;
-	
-	first_callback_pose = false;
+	pcl::fromROSMsg(*msg, *cloud);
+	ClearCloud();
+	NormalEstimation();
+	Visualization();
 }
 
-void YawEstimationWalls::CallbackNormals(const sensor_msgs::PointCloud2ConstPtr &msg)
+void YawEstimationWalls::CallbackOdom(const nav_msgs::OdometryConstPtr& msg)
 {
-	// std::cout << "CALLBACK NORMALS" << std::endl;
-	pcl::PointCloud<pcl::InterestPoint>::Ptr tmp_pc (new pcl::PointCloud<pcl::InterestPoint>);
-	pcl::fromROSMsg(*msg, *tmp_pc);
-	walls_now->points.clear();
-	for(size_t i=1;i<tmp_pc->points.size();i++)	walls_now->points.push_back(tmp_pc->points[i]);
+	odom_now = *msg;
 
-	if(!first_callback_pose)	MatchWalls();
-
-	Visualizer();
-	
-	pose_last = pose_now;
-	*walls_last = *walls_now;
+	first_callback_odom = false;
 }
 
-void YawEstimationWalls::MatchWalls(void)
+void YawEstimationWalls::ClearCloud(void)
 {
-	// std::cout << "MATCh WALLS" << std::endl;
-	if(walls_last->points.empty()){
-		*walls_last = *walls_now;
-		viewer.addSphere (walls_last->points[0], 1.0, 0.5, 0.5, 0.0, "sphere");
-	}
-	else{
-		/*rotate wall points*/
-		tf::Quaternion relative_rotation = pose_now*pose_last.inverse();
-		relative_rotation.normalize();
-		Eigen::Quaternionf rotation(relative_rotation.w(), relative_rotation.x(), relative_rotation.y(), relative_rotation.z());
-		Eigen::Vector3f offset(0.0, 0.0, 0.0);
-		pcl::transformPointCloud(*walls_now, *walls_now_rotated, offset, rotation);
-		/*matching*/
-		int k = 1;
-		pcl::KdTreeFLANN<pcl::InterestPoint> kdtree;
-		std::vector<int> pointIdxNKNSearch(k);
-		std::vector<float> pointNKNSquaredDistance(k);
-		kdtree.setInputCloud(walls_now_rotated);
-		const double threshold_matching_distance = 0.4;
-		std::vector<double> list_yawrate;
-		std::vector<double> list_strength;
-		for(size_t i=0;i<walls_last->points.size();i++){
-			if(kdtree.nearestKSearch(walls_last->points[i], k, pointIdxNKNSearch, pointNKNSquaredDistance)<=0)	std::cout << "kdtree error" << std::endl;
-			if(sqrt(pointNKNSquaredDistance[0])<threshold_matching_distance){
-				std::cout << "pointNKNSquaredDistance[0] = " << pointNKNSquaredDistance[0] << std::endl;
-				std::cout << "sqrt(pointNKNSquaredDistance[0]) = " << sqrt(pointNKNSquaredDistance[0]) << std::endl;
-				double yawrate = ComputeYawRate(walls_now->points[pointIdxNKNSearch[0]], walls_last->points[i]);
-				list_yawrate.push_back(yawrate);
-				list_strength.push_back(walls_now->points[pointIdxNKNSearch[0]].strength + walls_last->points[i].x);
-			}
+	d_gauss->points.clear();
+	normals->points.clear();
+}
+
+void YawEstimationWalls::NormalEstimation(void)
+{
+	std::cout << "NORMAL ESTIMATION" << std::endl;
+	kdtree.setInputCloud(cloud);
+
+	const size_t skip_step = 5;
+	for(size_t i=0;i<cloud->points.size();i+=skip_step){
+		/*search neighbor points*/
+		std::vector<int> indices;
+		float curvature;
+		Eigen::Vector4f plane_parameters;
+		double laser_distance = sqrt(cloud->points[i].x*cloud->points[i].x + cloud->points[i].y*cloud->points[i].y + cloud->points[i].z*cloud->points[i].z);
+		const double search_radius_min = 0.5;
+		const double ratio = 0.09;
+		double search_radius = ratio*laser_distance;
+		if(search_radius<search_radius_min)	search_radius = search_radius_min;
+		indices = KdtreeSearch(cloud->points[i], search_radius);
+		
+		/*judge*/		
+		const size_t num_neighborpoints = 50;
+		if(indices.size()<num_neighborpoints){
+			std::cout << ">> indices.size() = " << indices.size() << " < " << num_neighborpoints << ", then skip" << std::endl;
+			continue;
 		}
-		viewer.updateSphere(walls_last->points[0], threshold_matching_distance, 0.5, 0.5, 0.0, "sphere");
-		if(!list_yawrate.empty()){
-			double yawrate_ave = 0.0;
-			double strength_sum = 0.0;
-			for(size_t i=0;i<list_yawrate.size();i++){
-				yawrate_ave += list_strength[i]*list_yawrate[i];
-				strength_sum += list_strength[i];
-			}
-			yawrate_ave /= strength_sum;
-			// std::cout << "yaw rate = " << yawrate_ave << std::endl;
-			pub.publish(yawrate_ave);
+		/*compute normal*/
+		pcl::computePointNormal(*cloud, indices, plane_parameters, curvature);
+		/*judge*/
+		const double threshold_square_error = 0.01;
+		if(ComputeSquareError(plane_parameters, indices)>threshold_square_error){
+			std::cout << ">> square error = " << ComputeSquareError(plane_parameters, indices) << " > " << threshold_square_error << ", then skip" << std::endl;
+			continue;
 		}
+		/*delete nan*/
+		if(std::isnan(plane_parameters[0]) || std::isnan(plane_parameters[1]) || std::isnan(plane_parameters[2])){
+			std::cout << ">> this point has NAN, then skip" << std::endl;
+			continue;
+		}
+		/*input*/
+		std::cout << ">> ok, then input" << std::endl;
+		pcl::PointXYZ tmp_point;
+		tmp_point.x = -plane_parameters[3]*plane_parameters[0];
+		tmp_point.y = -plane_parameters[3]*plane_parameters[1];
+		tmp_point.z = -plane_parameters[3]*plane_parameters[2];
+		d_gauss->points.push_back(tmp_point);
+		/*input(just for visualization)*/
+		pcl::PointNormal tmp_normal;
+		tmp_normal.x = cloud->points[i].x;
+		tmp_normal.y = cloud->points[i].y;
+		tmp_normal.z = cloud->points[i].z;
+		tmp_normal.normal_x = plane_parameters[0];
+		tmp_normal.normal_y = plane_parameters[1];
+		tmp_normal.normal_z = plane_parameters[2];
+		tmp_normal.curvature = curvature;
+		flipNormalTowardsViewpoint(tmp_normal, 0.0, 0.0, 0.0, tmp_normal.normal_x, tmp_normal.normal_y, tmp_normal.normal_z);
+		normals->points.push_back(tmp_normal);
 	}
 }
 
-double YawEstimationWalls::ComputeYawRate(pcl::InterestPoint p_origin, pcl::InterestPoint p_target)
+std::vector<int> YawEstimationWalls::KdtreeSearch(pcl::PointXYZ searchpoint, double search_radius)
 {
-	tf::Quaternion q1(p_origin.x, p_origin.y, p_origin.z, 1.0);
-	tf::Quaternion q2(p_target.x, p_target.y, p_target.z, 1.0);
-	tf::Quaternion relative_rotation = (pose_last*q2)*(pose_last*q1).inverse();
-	relative_rotation.normalize();
-	double roll, pitch, yaw;
-	tf::Matrix3x3(relative_rotation).getRPY(roll, pitch, yaw);
-	std::cout << "yaw rate = " << yaw << std::endl;
-	std::cout << "acosf(q1.x()*q2.x()+q1.y()*q2.y()+q1.z()*q2.z()) = " << acosf(q1.x()*q2.x()+q1.y()*q2.y()+q1.z()*q2.z()) << std::endl;
-	return yaw;
+	std::vector<int> pointIdxRadiusSearch;
+	std::vector<float> pointRadiusSquaredDistance;
+	if(kdtree.radiusSearch(searchpoint, search_radius, pointIdxRadiusSearch, pointRadiusSquaredDistance)<=0)	std::cout << "kdtree error" << std::endl;
+	return pointIdxRadiusSearch; 
 }
 
-void YawEstimationWalls::Visualizer(void)
+double YawEstimationWalls::ComputeSquareError(Eigen::Vector4f plane_parameters, std::vector<int> indices)
 {
-	// std::cout << "VISUALIZER" << std::endl;
-	
-	viewer.removePointCloud("walls_now");
-	viewer.addPointCloud<pcl::InterestPoint>(walls_now, "walls_now");
-	viewer.setPointCloudRenderingProperties (pcl::visualization::PCL_VISUALIZER_COLOR, 1.0, 0.0, 0.0, "walls_now");
-	viewer.setPointCloudRenderingProperties (pcl::visualization::PCL_VISUALIZER_POINT_SIZE, 5, "walls_now");
-	
-	viewer.removePointCloud("walls_now_rotated");
-	viewer.addPointCloud<pcl::InterestPoint>(walls_now_rotated, "walls_now_rotated");
-	viewer.setPointCloudRenderingProperties (pcl::visualization::PCL_VISUALIZER_COLOR, 0.0, 1.0, 0.0, "walls_now_rotated");
-	viewer.setPointCloudRenderingProperties (pcl::visualization::PCL_VISUALIZER_POINT_SIZE, 5, "walls_now_rotated");
+	double sum_square_error = 0.0;
+	for(size_t i=0;i<indices.size();i++){
+		double square_error =	fabs(plane_parameters[0]*cloud->points[indices[i]].x
+									+plane_parameters[1]*cloud->points[indices[i]].y
+									+plane_parameters[2]*cloud->points[indices[i]].z
+									+plane_parameters[3])
+								/sqrt(plane_parameters[0]*plane_parameters[0]
+									+plane_parameters[1]*plane_parameters[1]
+									+plane_parameters[2]*plane_parameters[2]);
+		sum_square_error += square_error/(double)indices.size();
+	}
+	return sum_square_error;
+}
 
-	viewer.removePointCloud("walls_last");
-	viewer.addPointCloud<pcl::InterestPoint>(walls_last, "walls_last");
-	viewer.setPointCloudRenderingProperties (pcl::visualization::PCL_VISUALIZER_COLOR, 0.0, 0.0, 1.0, "walls_last");
-	viewer.setPointCloudRenderingProperties (pcl::visualization::PCL_VISUALIZER_POINT_SIZE, 5, "walls_last");
+void YawEstimationWalls::PointCluster(void)
+{
+}
 
+void YawEstimationWalls::Visualization(void)
+{
+	viewer.removeAllPointClouds();
+
+	viewer.addPointCloud(cloud, "cloud");
+	viewer.setPointCloudRenderingProperties (pcl::visualization::PCL_VISUALIZER_COLOR, 0.0, 0.0, 0.0, "cloud");
+	viewer.setPointCloudRenderingProperties (pcl::visualization::PCL_VISUALIZER_POINT_SIZE, 3, "cloud");
+	
+	viewer.addPointCloud(d_gauss, "d_gauss");
+	viewer.setPointCloudRenderingProperties (pcl::visualization::PCL_VISUALIZER_COLOR, 1.0, 0.0, 0.0, "d_gauss");
+	viewer.setPointCloudRenderingProperties (pcl::visualization::PCL_VISUALIZER_POINT_SIZE, 3, "d_gauss");
+	
+	viewer.addPointCloudNormals<pcl::PointNormal>(normals, 1, 0.5, "normals");
+	viewer.setPointCloudRenderingProperties (pcl::visualization::PCL_VISUALIZER_COLOR, 0.0, 1.0, 1.0, "normals");
+	viewer.setPointCloudRenderingProperties (pcl::visualization::PCL_VISUALIZER_LINE_WIDTH, 1, "normals");
+	
 	viewer.spinOnce();
 }
 
