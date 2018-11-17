@@ -3,10 +3,14 @@
 	
 	<node pkg="rosbag" type="play" name="player" args="--clock /home/amsl/ozaki/bagfiles/velodyne_realsense/2018-10-06-12-14-59.bag"/>
 
-	<node pkg="rviz" type="rviz" name="rviz_startpoint" args="-d /home/amsl/.rviz/velodyne.rviz"/>
+	<node pkg="rviz" type="rviz" name="rviz_startpoint" args="-d /home/amsl/.rviz/trajectories_skyview.rviz"/>
 
 	<include file="$(find velodyne_pointcloud)/launch/32e_points.launch"/>
 	
+	<node pkg="pose_estimation_walls" name="imu_initial_alignment" type="imu_initial_alignment" output="screen"/>
 	<node pkg="pose_estimation_walls" name="gyrodometry" type="gyrodometry"/>
 	<node pkg="pose_estimation_walls" name="yaw_estimation_walls" type="yaw_estimation_walls" output="screen"/>
+	<node pkg="pose_estimation_walls" name="combine_linearvelocity_and_pose" type="combine_linearvelocity_and_pose">
+		<remap from="/pose_ekf" to="/pose"/>
+	</node>
 </launch>
