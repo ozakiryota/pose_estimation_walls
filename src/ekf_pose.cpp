@@ -18,6 +18,7 @@ class EKFPose{
 		ros::Subscriber sub_bias;
 		ros::Subscriber sub_imu;
 		ros::Subscriber sub_slam;
+		ros::Subscriber sub_dgauss;
 		ros::Subscriber sub_walls;
 		/*publish*/
 		ros::Publisher pub;
@@ -55,6 +56,7 @@ class EKFPose{
 		void PredictionIMU(sensor_msgs::Imu imu, double dt);
 		void CallbackSLAM(const geometry_msgs::PoseStampedConstPtr& msg);
 		void ObservationSLAM(void);
+		void CallbackPoseDGauss(const geometry_msgs::PoseStampedConstPtr& msg);
 		void CallbackWalls(const sensor_msgs::PointCloud2ConstPtr& msg);
 		// void ObservationWalls(pcl::PointNormal g_vector);
 		void ObservationWalls(pcl::InterestPoint g_vector);
@@ -68,6 +70,7 @@ EKFPose::EKFPose()
 	sub_bias = nh.subscribe("/imu_bias", 1, &EKFPose::CallbackBias, this);
 	sub_imu = nh.subscribe("/imu/data", 1, &EKFPose::CallbackIMU, this);
 	sub_slam = nh.subscribe("/lsd_slam/pose", 1, &EKFPose::CallbackSLAM, this);
+	sub_dgauss = nh.subscribe("/pose_dgauss", 1, &EKFPose::CallbackPoseDGauss, this);
 	sub_walls = nh.subscribe("/g_and_walls", 1, &EKFPose::CallbackWalls, this);
 	pub = nh.advertise<geometry_msgs::PoseStamped>("/pose_ekf", 1);
 	q_pose = tf::Quaternion(0.0, 0.0, 0.0, 1.0);
@@ -237,22 +240,48 @@ void EKFPose::ObservationSLAM(void)
 	q_pose = tf::createQuaternionFromRPY(X(0, 0), X(1, 0), X(2, 0));
 }
 
+void EKFPose::CallbackPoseDGauss(const geometry_msgs::PoseStampedConstPtr& msg)
+{
+	tf::Quaternion q_pose_dgauss;
+	quaternionMsgToTF(msg->pose.orientation, q_pose_dgauss);
+
+	if(inipose_is_available){
+		std::cout << "Callback Pose D-Gauss" << std::endl;
+		const int num_obs = 3;
+		Eigen::MatrixXd Z(num_obs, 1);
+		// tf::Matrix3x3(q_pose_dgauss).getRPY(Z(0, 0), Z(1, 0), Z(2, 0));
+		tf::Matrix3x3(q_pose_dgauss).getRPY(Z(0, 0), Z(1, 0), Z(2, 0));
+		Eigen::MatrixXd H = Eigen::MatrixXd::Identity(num_obs, num_state);
+		Eigen::MatrixXd jH = Eigen::MatrixXd::Identity(num_obs, num_state);
+		const double sigma = 1.0e+1;
+		Eigen::MatrixXd R = sigma*Eigen::MatrixXd::Identity(num_obs, num_obs);
+		Eigen::MatrixXd Y(num_obs, 1);
+		Eigen::MatrixXd S(num_obs, num_obs);
+		Eigen::MatrixXd K(num_state, num_obs);
+		Eigen::MatrixXd I = Eigen::MatrixXd::Identity(num_state, num_state);
+		Y = Z - H*X;
+		for(int i=0;i<3;i++){
+			if(Y(i, 0)>M_PI)	Y(i, 0) -= 2.0*M_PI;
+			else if(Y(i, 0)<-M_PI)	Y(i, 0) += 2.0*M_PI;
+		}
+		S = jH*P*jH.transpose() + R;
+		K = P*jH.transpose()*S.inverse();
+		X = X + K*Y;
+		for(int i=0;i<3;i++){
+			if(X(i, 0)>M_PI)	X(i, 0) -= 2.0*M_PI;
+			else if(X(i, 0)<-M_PI)	X(i, 0) += 2.0*M_PI;
+		}
+		P = (I - K*jH)*P;
+
+		std::cout << "Y = " << std::endl << Y << std::endl;
+		std::cout << "K*Y = " << std::endl << K*Y << std::endl;
+	}
+
+	q_pose = tf::createQuaternionFromRPY(X(0, 0), X(1, 0), X(2, 0));
+}
+
 void EKFPose::CallbackWalls(const sensor_msgs::PointCloud2ConstPtr& msg)
 {
-	// pcl::PointCloud<pcl::PointNormal>::Ptr tmp_normals (new pcl::PointCloud<pcl::PointNormal>);
-	// pcl::PointNormal g_vector;
-	// pcl::fromROSMsg(*msg, *tmp_normals);
-	// walls_now->points.clear();
-	// for(size_t i=0;i<tmp_normals->points.size();i++){
-	// 	if(i==0)	g_vector = tmp_normals->points[i];
-	// 	else{
-	// 		pcl::PointXYZ tmp_point;
-	// 		tmp_point.x = tmp_normals->points[i].normal_x;
-	// 		tmp_point.y = tmp_normals->points[i].normal_y;
-	// 		tmp_point.z = tmp_normals->points[i].normal_z;
-	// 		walls_now->points.push_back(tmp_point);
-	// 	}
-	// }
 	pcl::PointCloud<pcl::InterestPoint>::Ptr tmp_pc (new pcl::PointCloud<pcl::InterestPoint>);
 	pcl::InterestPoint g_vector;
 	pcl::fromROSMsg(*msg, *tmp_pc);
@@ -260,11 +289,6 @@ void EKFPose::CallbackWalls(const sensor_msgs::PointCloud2ConstPtr& msg)
 	for(size_t i=0;i<tmp_pc->points.size();i++){
 		if(i==0)	g_vector = tmp_pc->points[i];
 		else{
-			// pcl::PointXYZ tmp_point;
-			// tmp_point.x = tmp_pc->points[i].x;
-			// tmp_point.y = tmp_pc->points[i].y;
-			// tmp_point.z = tmp_pc->points[i].z;
-			// walls_now->points.push_back(tmp_point);
 			walls_now->points.push_back(tmp_pc->points[i]);
 			g_vector.strength += tmp_pc->points[i].strength;
 		}
@@ -285,9 +309,6 @@ void EKFPose::ObservationWalls(pcl::InterestPoint g_vector)
 	std::cout << count_usingwalls << ": CALLBACK USINGWALLS" << std::endl;
 	
 	const double g = -9.80665;
-	// double gx = g_vector.normal_x*g; 
-	// double gy = g_vector.normal_y*g; 
-	// double gz = g_vector.normal_z*g; 
 	double gx = g_vector.x*g; 
 	double gy = g_vector.y*g; 
 	double gz = g_vector.z*g; 
@@ -317,10 +338,10 @@ void EKFPose::ObservationWalls(pcl::InterestPoint g_vector)
 	/*yaw estimation*/
 	double yaw_walls;
 	double strength_sum = 0.0;
-	if(YawEstimationWalls(yaw_walls, strength_sum)){
-		Z(2, 0) = yaw_walls;
-		R(2, 2) = 1.0/strength_sum*1.0e+2;
-	}
+	// if(YawEstimationWalls(yaw_walls, strength_sum)){
+	// 	Z(2, 0) = yaw_walls;
+	// 	R(2, 2) = 1.0/strength_sum*1.0e+2;
+	// }
 
 	Y = Z - H*X;
 	// for(int i=0;i<num_obs;i++)	Y(i, 0) = atan2(sin(Y(i, 0)), cos(Y(i, 0)));

@@ -9,9 +9,11 @@
 	
 	<node pkg="pose_estimation_walls" name="imu_initial_alignment" type="imu_initial_alignment" output="screen"/>
 	<node pkg="pose_estimation_walls" name="gyrodometry" type="gyrodometry"/>
-	<node pkg="pose_estimation_walls" name="yaw_estimation_walls" type="yaw_estimation_walls" output="screen"/>
+	<node pkg="pose_estimation_walls" name="yaw_estimation_walls" type="yaw_estimation_walls" output="screen">
+		<remap from="/combined_odometry" to="/gyrodometry"/>
+	</node>
 	<node pkg="pose_estimation_walls" name="combine_linearvelocity_and_pose" type="combine_linearvelocity_and_pose">
-		<remap from="/pose_ekf" to="/pose"/>
+		<remap from="/pose_ekf" to="/pose_dgauss"/>
 	</node>
 
 	<include file="$(find loam_velodyne)/launch/hector_loam_velodyne.launch"/>

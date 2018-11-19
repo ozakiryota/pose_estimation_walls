@@ -71,8 +71,9 @@ class YawEstimationWalls{
 YawEstimationWalls::YawEstimationWalls()
 {
 	sub_pc = nh.subscribe("/velodyne_points", 1, &YawEstimationWalls::CallbackPC, this);
-	sub_odom = nh.subscribe("/gyrodometry", 1, &YawEstimationWalls::CallbackOdom, this);
-	pub_pose = nh.advertise<geometry_msgs::PoseStamped>("/pose", 1);
+	// sub_odom = nh.subscribe("/gyrodometry", 1, &YawEstimationWalls::CallbackOdom, this);
+	sub_odom = nh.subscribe("/combined_odometry", 1, &YawEstimationWalls::CallbackOdom, this);
+	pub_pose = nh.advertise<geometry_msgs::PoseStamped>("/pose_dgauss", 1);
 	viewer.setBackgroundColor(1, 1, 1);
 	viewer.addCoordinateSystem(0.5, "axis");
 	g_vector_from_ekf.x = 0.0;
@@ -121,7 +122,7 @@ void YawEstimationWalls::NormalEstimation(void)
 	// std::cout << "NORMAL ESTIMATION" << std::endl;
 	kdtree.setInputCloud(cloud);
 
-	const size_t skip_step = 4;
+	const size_t skip_step = 3;
 	for(size_t i=0;i<cloud->points.size();i+=skip_step){
 		/*search neighbor points*/
 		std::vector<int> indices;
@@ -273,20 +274,20 @@ pcl::PointXYZ YawEstimationWalls::PointTransformation(pcl::PointXYZ p, nav_msgs:
 	relative_rotation.normalize();
 	tf::Quaternion q_point_target = relative_rotation*q_point_origin*relative_rotation.inverse();
 	/*linear*/
-	tf::Quaternion q_local_move(
+	tf::Quaternion q_global_move(
 			target.pose.pose.position.x - origin.pose.pose.position.x,
 			target.pose.pose.position.y - origin.pose.pose.position.y,
 			target.pose.pose.position.z - origin.pose.pose.position.z,
 			1.0);
-	tf::Quaternion q_global_move = q_pose_origin.inverse()*q_local_move*q_pose_origin;
-	Eigen::Vector3d Move(q_global_move.x(), q_global_move.y(), q_global_move.z());
+	tf::Quaternion q_local_move = q_pose_origin.inverse()*q_global_move*q_pose_origin;
+	Eigen::Vector3d Move(q_local_move.x(), q_local_move.y(), q_local_move.z());
 	Eigen::Vector3d Normal(p.x, p.y, p.z);
 	Move = (Move.dot(Normal)/Normal.dot(Normal))*Normal;
 	/*input*/
 	pcl::PointXYZ p_;
-	p_.x = q_point_target.x() - Move(0, 0);
-	p_.y = q_point_target.y() - Move(1, 0);
-	p_.z = q_point_target.z() - Move(2, 0);
+	p_.x = q_point_target.x() - Move(0);
+	p_.y = q_point_target.y() - Move(1);
+	p_.z = q_point_target.z() - Move(2);
 	return p_;
 }
 
@@ -300,7 +301,7 @@ bool YawEstimationWalls::MatchWalls(void)
 		return false;
 	}
 	else{
-		const double threshold_matching_distance = 0.30;
+		const double threshold_matching_distance = 0.20;
 		const int threshold_count_match = 5;
 		const int k = 1;
 		kdtree.setInputCloud(centroids_registered);
@@ -314,7 +315,8 @@ bool YawEstimationWalls::MatchWalls(void)
 				list_walls[pointIdxNKNSearch[0]].count_match++;
 				list_walls[pointIdxNKNSearch[0]].count_nomatch = 0;
 				if(list_walls[pointIdxNKNSearch[0]].fixed){
-					list_local_pose_error.push_back(GetRelativeRotation(centroids_now->points[i], list_walls[pointIdxNKNSearch[0]].point));
+					// list_local_pose_error.push_back(GetRelativeRotation(centroids_now->points[i], list_walls[pointIdxNKNSearch[0]].point));
+					list_local_pose_error.push_back(GetRelativeRotation(centroids_now->points[i], centroids_registered->points[pointIdxNKNSearch[0]]));
 				}
 				else{
 					list_walls[pointIdxNKNSearch[0]].point = centroids_now->points[i];
@@ -389,7 +391,7 @@ void YawEstimationWalls::KalmanFilterForRegistration(WallInfo& wall)
 			p.z;
 	Eigen::MatrixXd H = Eigen::MatrixXd::Identity(num_obs, num_state);
 	Eigen::MatrixXd jH = Eigen::MatrixXd::Identity(num_obs, num_state);
-	const double sigma_obs = 1.0e+1;
+	const double sigma_obs = 1.0e+100;
 	Eigen::MatrixXd R = sigma_obs*Eigen::MatrixXd::Identity(num_obs, num_obs);
 	Eigen::MatrixXd Y(num_obs, 1);
 	Eigen::MatrixXd S(num_obs, num_obs);
@@ -420,6 +422,16 @@ tf::Quaternion YawEstimationWalls::GetRelativeRotation(pcl::PointXYZ origin, pcl
 	relative_rotation.normalize();
 	return relative_rotation;
 }
+// tf::Quaternion YawEstimationWalls::GetRelativeRotation(pcl::PointXYZ origin, pcl::PointXYZ target)
+// {
+// 	tf::Quaternion q_point_origin(origin.x, origin.y, origin.z, 1.0);
+// 	tf::Quaternion q_point_target(target.x, target.y, target.z, 1.0);
+// 	q_point_origin.normalize();
+// 	q_point_target.normalize();
+// 	tf::Quaternion relative_rotation = q_point_target*q_point_origin.inverse();
+// 	relative_rotation.normalize();
+// 	return relative_rotation;
+// }
 
 void YawEstimationWalls::Visualization(void)
 {
