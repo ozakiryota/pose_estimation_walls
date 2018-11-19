@@ -135,7 +135,7 @@ bool ImuInitialAlignment::JudgeMoving(void)
 void ImuInitialAlignment::Prediction(void)
 {
 	Eigen::MatrixXd A = Eigen::MatrixXd::Identity(num_state, num_state);
-	Eigen::MatrixXd F(num_state, num_state);
+	Eigen::MatrixXd F(num_state, 1);
 	Eigen::MatrixXd jF = Eigen::MatrixXd::Identity(num_state, num_state);
 	const double sigma = 1.0e-1;
 	Eigen::MatrixXd Q = sigma*Eigen::MatrixXd::Identity(num_state, num_state);
