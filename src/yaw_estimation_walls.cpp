@@ -219,7 +219,7 @@ void YawEstimationWalls::PointCluster(void)
 {
 	// std::cout << "POINT CLUSTER" << std::endl;
 	const double threshold_cluster_distance = 0.15;	//[m]
-	const int minimum_cluster_belongings = 10;
+	const int minimum_cluster_belongings = 25;
 	pcl::search::KdTree<pcl::PointXYZ>::Ptr tree (new pcl::search::KdTree<pcl::PointXYZ>);
 	tree->setInputCloud(d_gauss);
 	std::vector<pcl::PointIndices> cluster_indices;
@@ -301,7 +301,7 @@ bool YawEstimationWalls::MatchWalls(void)
 		return false;
 	}
 	else{
-		const double threshold_matching_distance = 0.20;
+		const double threshold_matching_distance = 0.5;
 		const int threshold_count_match = 5;
 		const int k = 1;
 		kdtree.setInputCloud(centroids_registered);
@@ -411,27 +411,27 @@ void YawEstimationWalls::KalmanFilterForRegistration(WallInfo& wall)
 	std::cout << "K*Y = " << std::endl << K*Y << std::endl;
 }
 
-tf::Quaternion YawEstimationWalls::GetRelativeRotation(pcl::PointXYZ origin, pcl::PointXYZ target)
-{
-	Eigen::Vector3d Origin(origin.x, origin.y, origin.z);
-	Eigen::Vector3d Target(target.x, target.y, target.z);
-	double theta = acos(Origin.dot(Target)/Origin.norm()/Target.norm());
-	Eigen::Vector3d Axis = Origin.cross(Target);
-	Axis.normalize();
-	tf::Quaternion relative_rotation(sin(theta/2.0)*Axis(0), sin(theta/2.0)*Axis(1), sin(theta/2.0)*Axis(2), cos(theta/2.0));
-	relative_rotation.normalize();
-	return relative_rotation;
-}
 // tf::Quaternion YawEstimationWalls::GetRelativeRotation(pcl::PointXYZ origin, pcl::PointXYZ target)
 // {
-// 	tf::Quaternion q_point_origin(origin.x, origin.y, origin.z, 1.0);
-// 	tf::Quaternion q_point_target(target.x, target.y, target.z, 1.0);
-// 	q_point_origin.normalize();
-// 	q_point_target.normalize();
-// 	tf::Quaternion relative_rotation = q_point_target*q_point_origin.inverse();
+// 	Eigen::Vector3d Origin(origin.x, origin.y, origin.z);
+// 	Eigen::Vector3d Target(target.x, target.y, target.z);
+// 	double theta = acos(Origin.dot(Target)/Origin.norm()/Target.norm());
+// 	Eigen::Vector3d Axis = Origin.cross(Target);
+// 	Axis.normalize();
+// 	tf::Quaternion relative_rotation(sin(theta/2.0)*Axis(0), sin(theta/2.0)*Axis(1), sin(theta/2.0)*Axis(2), cos(theta/2.0));
 // 	relative_rotation.normalize();
 // 	return relative_rotation;
 // }
+tf::Quaternion YawEstimationWalls::GetRelativeRotation(pcl::PointXYZ origin, pcl::PointXYZ target)
+{
+	tf::Quaternion q_point_origin(origin.x, origin.y, origin.z, 1.0);
+	tf::Quaternion q_point_target(target.x, target.y, target.z, 1.0);
+	q_point_origin.normalize();
+	q_point_target.normalize();
+	tf::Quaternion relative_rotation = q_point_target*q_point_origin.inverse();
+	relative_rotation.normalize();
+	return relative_rotation;
+}
 
 void YawEstimationWalls::Visualization(void)
 {

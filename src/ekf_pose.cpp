@@ -247,12 +247,39 @@ void EKFPose::CallbackPoseDGauss(const geometry_msgs::PoseStampedConstPtr& msg)
 
 	if(inipose_is_available){
 		std::cout << "Callback Pose D-Gauss" << std::endl;
-		const int num_obs = 3;
-		Eigen::MatrixXd Z(num_obs, 1);
+		// const int num_obs = 3;
+		// Eigen::MatrixXd Z(num_obs, 1);
+		// // tf::Matrix3x3(q_pose_dgauss).getRPY(Z(0, 0), Z(1, 0), Z(2, 0));
 		// tf::Matrix3x3(q_pose_dgauss).getRPY(Z(0, 0), Z(1, 0), Z(2, 0));
-		tf::Matrix3x3(q_pose_dgauss).getRPY(Z(0, 0), Z(1, 0), Z(2, 0));
-		Eigen::MatrixXd H = Eigen::MatrixXd::Identity(num_obs, num_state);
-		Eigen::MatrixXd jH = Eigen::MatrixXd::Identity(num_obs, num_state);
+		// Eigen::MatrixXd H = Eigen::MatrixXd::Identity(num_obs, num_state);
+		// Eigen::MatrixXd jH = Eigen::MatrixXd::Identity(num_obs, num_state);
+		// const double sigma = 1.0e+1;
+		// Eigen::MatrixXd R = sigma*Eigen::MatrixXd::Identity(num_obs, num_obs);
+		// Eigen::MatrixXd Y(num_obs, 1);
+		// Eigen::MatrixXd S(num_obs, num_obs);
+		// Eigen::MatrixXd K(num_state, num_obs);
+		// Eigen::MatrixXd I = Eigen::MatrixXd::Identity(num_state, num_state);
+		// Y = Z - H*X;
+		// for(int i=0;i<3;i++){
+		// 	if(Y(i, 0)>M_PI)	Y(i, 0) -= 2.0*M_PI;
+		// 	else if(Y(i, 0)<-M_PI)	Y(i, 0) += 2.0*M_PI;
+		// }
+		// S = jH*P*jH.transpose() + R;
+		// K = P*jH.transpose()*S.inverse();
+		// X = X + K*Y;
+		// for(int i=0;i<3;i++){
+		// 	if(X(i, 0)>M_PI)	X(i, 0) -= 2.0*M_PI;
+		// 	else if(X(i, 0)<-M_PI)	X(i, 0) += 2.0*M_PI;
+		// }
+		// P = (I - K*jH)*P;
+		const int num_obs = 1;
+		double roll, pitch, yaw;
+		tf::Matrix3x3(q_pose_dgauss).getRPY(roll, pitch, yaw);
+		Eigen::MatrixXd Z(num_obs, 1);
+		Z <<	yaw;
+		Eigen::MatrixXd H(num_obs, num_state);
+		H <<	0,	0,	1;
+		Eigen::MatrixXd jH = H;
 		const double sigma = 1.0e+1;
 		Eigen::MatrixXd R = sigma*Eigen::MatrixXd::Identity(num_obs, num_obs);
 		Eigen::MatrixXd Y(num_obs, 1);
