@@ -126,8 +126,6 @@ void YawEstimationWalls::NormalEstimation(void)
 	for(size_t i=0;i<cloud->points.size();i+=skip_step){
 		/*search neighbor points*/
 		std::vector<int> indices;
-		float curvature;
-		Eigen::Vector4f plane_parameters;
 		double laser_distance = sqrt(cloud->points[i].x*cloud->points[i].x + cloud->points[i].y*cloud->points[i].y + cloud->points[i].z*cloud->points[i].z);
 		const double search_radius_min = 0.5;
 		const double ratio = 0.09;
@@ -142,6 +140,8 @@ void YawEstimationWalls::NormalEstimation(void)
 			continue;
 		}
 		/*compute normal*/
+		float curvature;
+		Eigen::Vector4f plane_parameters;
 		pcl::computePointNormal(*cloud, indices, plane_parameters, curvature);
 		
 		pcl::PointNormal tmp_normal;
@@ -233,10 +233,10 @@ void YawEstimationWalls::PointCluster(void)
 
 	// std::cout << "cluster_indices.size() = " << cluster_indices.size() << std::endl;
 
-	pcl::PointCloud<pcl::PointXYZ>::Ptr tmp_clustered_points (new pcl::PointCloud<pcl::PointXYZ>);
-	pcl::PointIndices::Ptr tmp_clustered_indices (new pcl::PointIndices);
 	for(size_t i=0;i<cluster_indices.size();i++){
 		/*extract*/
+		pcl::PointCloud<pcl::PointXYZ>::Ptr tmp_clustered_points (new pcl::PointCloud<pcl::PointXYZ>);
+		pcl::PointIndices::Ptr tmp_clustered_indices (new pcl::PointIndices);
 		*tmp_clustered_indices = cluster_indices[i];
 		pcl::ExtractIndices<pcl::PointXYZ> ei;
 		ei.setInputCloud(d_gauss);
@@ -265,7 +265,7 @@ void YawEstimationWalls::CreateRegisteredCentroidCloud(void)
 pcl::PointXYZ YawEstimationWalls::PointTransformation(pcl::PointXYZ p, nav_msgs::Odometry origin, nav_msgs::Odometry target)
 {
 	/*rotation*/
-	tf::Quaternion q_point_origin(p.x, p.y, p.z, 1.0);
+	tf::Quaternion q_point_origin(p.x, p.y, p.z, 0.0);
 	tf::Quaternion q_pose_origin;
 	tf::Quaternion q_pose_target;
 	quaternionMsgToTF(origin.pose.pose.orientation, q_pose_origin);
@@ -411,27 +411,27 @@ void YawEstimationWalls::KalmanFilterForRegistration(WallInfo& wall)
 	std::cout << "K*Y = " << std::endl << K*Y << std::endl;
 }
 
-// tf::Quaternion YawEstimationWalls::GetRelativeRotation(pcl::PointXYZ origin, pcl::PointXYZ target)
-// {
-// 	Eigen::Vector3d Origin(origin.x, origin.y, origin.z);
-// 	Eigen::Vector3d Target(target.x, target.y, target.z);
-// 	double theta = acos(Origin.dot(Target)/Origin.norm()/Target.norm());
-// 	Eigen::Vector3d Axis = Origin.cross(Target);
-// 	Axis.normalize();
-// 	tf::Quaternion relative_rotation(sin(theta/2.0)*Axis(0), sin(theta/2.0)*Axis(1), sin(theta/2.0)*Axis(2), cos(theta/2.0));
-// 	relative_rotation.normalize();
-// 	return relative_rotation;
-// }
 tf::Quaternion YawEstimationWalls::GetRelativeRotation(pcl::PointXYZ origin, pcl::PointXYZ target)
 {
-	tf::Quaternion q_point_origin(origin.x, origin.y, origin.z, 1.0);
-	tf::Quaternion q_point_target(target.x, target.y, target.z, 1.0);
-	q_point_origin.normalize();
-	q_point_target.normalize();
-	tf::Quaternion relative_rotation = q_point_target*q_point_origin.inverse();
+	Eigen::Vector3d Origin(origin.x, origin.y, origin.z);
+	Eigen::Vector3d Target(target.x, target.y, target.z);
+	double theta = acos(Origin.dot(Target)/Origin.norm()/Target.norm());
+	Eigen::Vector3d Axis = Origin.cross(Target);
+	Axis.normalize();
+	tf::Quaternion relative_rotation(sin(theta/2.0)*Axis(0), sin(theta/2.0)*Axis(1), sin(theta/2.0)*Axis(2), cos(theta/2.0));
 	relative_rotation.normalize();
 	return relative_rotation;
 }
+// tf::Quaternion YawEstimationWalls::GetRelativeRotation(pcl::PointXYZ origin, pcl::PointXYZ target)
+// {
+// 	tf::Quaternion q_point_origin(origin.x, origin.y, origin.z, 1.0);
+// 	tf::Quaternion q_point_target(target.x, target.y, target.z, 1.0);
+// 	q_point_origin.normalize();
+// 	q_point_target.normalize();
+// 	tf::Quaternion relative_rotation = q_point_target*q_point_origin.inverse();
+// 	relative_rotation.normalize();
+// 	return relative_rotation;
+// }
 
 void YawEstimationWalls::Visualization(void)
 {
