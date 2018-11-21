@@ -109,11 +109,16 @@ void YawEstimationWalls::MatchWalls(void)
 		if(!list_yawrate.empty()){
 			double yawrate_ave = 0.0;
 			double strength_sum = 0.0;
+			double sin_yaw = 0.0;
+			double cos_yaw = 0.0;
 			for(size_t i=0;i<list_yawrate.size();i++){
-				yawrate_ave += list_strength[i]*list_yawrate[i];
-				strength_sum += list_strength[i];
+				sin_yaw += list_strength[i]*sin(list_yawrate[i]);
+				cos_yaw += list_strength[i]*cos(list_yawrate[i]);
+				// yawrate_ave += list_strength[i]*list_yawrate[i];
+				// strength_sum += list_strength[i];
 			}
-			yawrate_ave /= strength_sum;
+			// yawrate_ave /= strength_sum;
+			yawrate_ave = atan2(sin_yaw, cos_yaw);
 			// std::cout << "yaw rate = " << yawrate_ave << std::endl;
 			pub.publish(yawrate_ave);
 		}

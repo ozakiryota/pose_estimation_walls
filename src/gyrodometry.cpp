@@ -83,9 +83,12 @@ void Gyrodometry::CallbackOdom(const nav_msgs::OdometryConstPtr& msg)
 	
 	Eigen::MatrixXd GlobalMove2d(3, 1);
 	GlobalMove2d <<	odom2d_now.pose.pose.position.x - odom2d_last.pose.pose.position.x,
-					odom2d_now.pose.pose.position.y - odom2d_last.pose.pose.position.y,					odom2d_now.pose.pose.position.z - odom2d_last.pose.pose.position.z;
-	Eigen::MatrixXd LocalMove2d = FrameRotation(odom2d_last.pose.pose.orientation, GlobalMove2d, true);
-	Eigen::MatrixXd GlobalMove3d = FrameRotation(odom3d_last.pose.pose.orientation, LocalMove2d, false);
+					odom2d_now.pose.pose.position.y - odom2d_last.pose.pose.position.y,
+					odom2d_now.pose.pose.position.z - odom2d_last.pose.pose.position.z;
+	// Eigen::MatrixXd LocalMove2d = FrameRotation(odom2d_last.pose.pose.orientation, GlobalMove2d, true);
+	// Eigen::MatrixXd GlobalMove3d = FrameRotation(odom3d_last.pose.pose.orientation, LocalMove2d, false);
+	Eigen::MatrixXd LocalMove2d = FrameRotation(odom2d_now.pose.pose.orientation, GlobalMove2d, true);
+	Eigen::MatrixXd GlobalMove3d = FrameRotation(odom3d_now.pose.pose.orientation, LocalMove2d, false);
 
 	odom3d_now.pose.pose.position.x = odom3d_last.pose.pose.position.x + GlobalMove3d(0, 0);
 	odom3d_now.pose.pose.position.y = odom3d_last.pose.pose.position.y + GlobalMove3d(1, 0);

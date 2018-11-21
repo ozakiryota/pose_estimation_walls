@@ -247,9 +247,9 @@ void EKFPose::CallbackPoseDGauss(const geometry_msgs::PoseStampedConstPtr& msg)
 
 	if(inipose_is_available){
 		std::cout << "Callback Pose D-Gauss" << std::endl;
+
 		// const int num_obs = 3;
 		// Eigen::MatrixXd Z(num_obs, 1);
-		// // tf::Matrix3x3(q_pose_dgauss).getRPY(Z(0, 0), Z(1, 0), Z(2, 0));
 		// tf::Matrix3x3(q_pose_dgauss).getRPY(Z(0, 0), Z(1, 0), Z(2, 0));
 		// Eigen::MatrixXd H = Eigen::MatrixXd::Identity(num_obs, num_state);
 		// Eigen::MatrixXd jH = Eigen::MatrixXd::Identity(num_obs, num_state);
@@ -272,6 +272,7 @@ void EKFPose::CallbackPoseDGauss(const geometry_msgs::PoseStampedConstPtr& msg)
 		// 	else if(X(i, 0)<-M_PI)	X(i, 0) += 2.0*M_PI;
 		// }
 		// P = (I - K*jH)*P;
+		
 		const int num_obs = 1;
 		double roll, pitch, yaw;
 		tf::Matrix3x3(q_pose_dgauss).getRPY(roll, pitch, yaw);
