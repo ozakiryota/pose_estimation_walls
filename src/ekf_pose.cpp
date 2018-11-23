@@ -328,7 +328,6 @@ void EKFPose::CallbackWalls(const sensor_msgs::PointCloud2ConstPtr& msg)
 	Publisher();
 }
 
-// void EKFPose::ObservationWalls(pcl::PointNormal g_vector)
 void EKFPose::ObservationWalls(pcl::InterestPoint g_vector)
 {
 	const int num_obs = 3;
@@ -379,9 +378,9 @@ void EKFPose::ObservationWalls(pcl::InterestPoint g_vector)
 	}
 	S = jH*P*jH.transpose() + R;
 	K = P*jH.transpose()*S.inverse();
-	// K(2, 0) = 0.0;	//temporary repair
-	// K(2, 1) = 0.0;	//temporary repair
-	// K(2, 2) = 0.0;	//temporary repair
+	K(2, 0) = 0.0;	//temporary repair
+	K(2, 1) = 0.0;	//temporary repair
+	K(2, 2) = 0.0;	//temporary repair
 	X = X + K*Y;
 	P = (I - K*jH)*P;
 		

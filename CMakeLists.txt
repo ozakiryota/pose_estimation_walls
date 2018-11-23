@@ -224,3 +224,5 @@ add_executable(combine_linearvelocity_and_yawrate src/combine_linearvelocity_and
 target_link_libraries(combine_linearvelocity_and_yawrate ${catkin_LIBRARIES})
 add_executable(multi_planes_segmentation src/multi_planes_segmentation.cpp)
 target_link_libraries(multi_planes_segmentation ${catkin_LIBRARIES})
+add_executable(odom_printer src/odom_printer.cpp)
+target_link_libraries(odom_printer ${catkin_LIBRARIES})

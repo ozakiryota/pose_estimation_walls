@@ -8,6 +8,7 @@ class OdomCreaterForLoamVelodyne{
 		ros::Subscriber sub;
 		ros::Publisher pub;
 		nav_msgs::Odometry odom_out;
+		tf::TransformBroadcaster tf_broadcaster;
 	public:
 		OdomCreaterForLoamVelodyne();
 		void Callback(const nav_msgs::OdometryConstPtr& msg);
@@ -37,7 +38,6 @@ void OdomCreaterForLoamVelodyne::Callback(const nav_msgs::OdometryConstPtr& msg)
 
 void OdomCreaterForLoamVelodyne::BroadcastTF(void)
 {
-	static tf::TransformBroadcaster broadcaster;
     geometry_msgs::TransformStamped transform;
 	transform.header = odom_out.header;
 	transform.child_frame_id = "/loamvelodyne_odometry";
@@ -45,7 +45,7 @@ void OdomCreaterForLoamVelodyne::BroadcastTF(void)
 	transform.transform.translation.y = odom_out.pose.pose.position.y;
 	transform.transform.translation.z = odom_out.pose.pose.position.z;
 	transform.transform.rotation = odom_out.pose.pose.orientation;
-	broadcaster.sendTransform(transform);
+	tf_broadcaster.sendTransform(transform);
 }
 
 int main(int argc, char** argv)

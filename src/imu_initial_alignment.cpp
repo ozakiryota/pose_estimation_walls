@@ -4,6 +4,7 @@
 #include <sensor_msgs/Imu.h>
 #include <geometry_msgs/Quaternion.h>
 #include <tf/tf.h>
+#include <tf/transform_broadcaster.h>
 
 class ImuInitialAlignment{
 	private:
@@ -13,6 +14,7 @@ class ImuInitialAlignment{
 		/*publish*/
 		ros::Publisher pub_inipose;
 		ros::Publisher pub_bias;
+		tf::TransformBroadcaster tf_broadcaster;
 		/*const*/
 		const int num_state = 3;
 		const double timelimit = 120.0;
@@ -33,6 +35,7 @@ class ImuInitialAlignment{
 		bool JudgeMoving(void);
 		void Prediction(void);
 		void Observation(void);
+		void Publication(void);
 };
 
 ImuInitialAlignment::ImuInitialAlignment()
@@ -76,10 +79,7 @@ void ImuInitialAlignment::Callback(const sensor_msgs::ImuConstPtr& msg)
 			Observation();
 		}
 	}
-	else{
-		pub_inipose.publish(initial_pose);
-		pub_bias.publish(average);
-	}
+	else	Publication();
 }
 
 void ImuInitialAlignment::ComputeAverage(void)
@@ -183,6 +183,23 @@ void ImuInitialAlignment::Observation(void)
 	P = (I - K*jH)*P;
 
 	// std::cout << "K*Y = " << std::endl << K*Y << std::endl;
+}
+
+void ImuInitialAlignment::Publication(void)
+{
+	/*publish*/
+	pub_inipose.publish(initial_pose);
+	pub_bias.publish(average);
+	/*tf broadcast*/
+    geometry_msgs::TransformStamped transform;
+	transform.header.stamp = ros::Time::now();
+	transform.header.frame_id = "/odom";
+	transform.child_frame_id = "/initial_pose";
+	transform.transform.translation.x = 0.0;
+	transform.transform.translation.y = 0.0;
+	transform.transform.translation.z = 0.0;
+	transform.transform.rotation = initial_pose;
+	tf_broadcaster.sendTransform(transform);
 }
 
 int main(int argc, char**argv)

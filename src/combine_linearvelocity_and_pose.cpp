@@ -13,6 +13,7 @@ class CombineLinearVelocityAndPose{
 		ros::Subscriber sub_pose;
 		/*publish*/
 		ros::Publisher pub;
+		tf::TransformBroadcaster tf_broadcaster;
 		/*odom*/
 		nav_msgs::Odometry odom2d_now;
 		nav_msgs::Odometry odom2d_last;
@@ -97,7 +98,6 @@ void CombineLinearVelocityAndPose::Publisher(void)
 	/*publish*/
 	pub.publish(odom3d_now);
 	/*tf broadcast */
-	static tf::TransformBroadcaster broadcaster;
     geometry_msgs::TransformStamped transform;
 	transform.header.stamp = ros::Time::now();
 	transform.header.frame_id = "/odom";
@@ -106,7 +106,7 @@ void CombineLinearVelocityAndPose::Publisher(void)
 	transform.transform.translation.y = odom3d_now.pose.pose.position.y;
 	transform.transform.translation.z = odom3d_now.pose.pose.position.z;
 	transform.transform.rotation = odom3d_now.pose.pose.orientation;
-	broadcaster.sendTransform(transform);
+	tf_broadcaster.sendTransform(transform);
 }
 
 int main(int argc, char** argv)

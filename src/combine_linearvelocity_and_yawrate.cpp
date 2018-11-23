@@ -14,6 +14,7 @@ class CombineLinearVelocityAndYawRate{
 		ros::Subscriber sub_yawrate;
 		/*publish*/
 		ros::Publisher pub;
+		tf::TransformBroadcaster tf_broadcaster;
 		/*odom*/
 		nav_msgs::Odometry odom2d_now;
 		nav_msgs::Odometry odom2d_last;
@@ -102,7 +103,6 @@ void CombineLinearVelocityAndYawRate::Publisher(void)
 	/*publish*/
 	pub.publish(odom3d_now);
 	/*tf broadcast */
-	static tf::TransformBroadcaster broadcaster;
     geometry_msgs::TransformStamped transform;
 	transform.header.stamp = ros::Time::now();
 	transform.header.frame_id = "/odom";
@@ -111,7 +111,7 @@ void CombineLinearVelocityAndYawRate::Publisher(void)
 	transform.transform.translation.y = odom3d_now.pose.pose.position.y;
 	transform.transform.translation.z = odom3d_now.pose.pose.position.z;
 	transform.transform.rotation = odom3d_now.pose.pose.orientation;
-	broadcaster.sendTransform(transform);
+	tf_broadcaster.sendTransform(transform);
 }
 
 int main(int argc, char** argv)

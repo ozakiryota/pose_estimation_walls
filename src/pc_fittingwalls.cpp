@@ -17,7 +17,7 @@ class PCFittingWalls{
 		/*publish*/
 		ros::Publisher pub;
 		/*viewer*/
-		pcl::visualization::PCLVisualizer viewer{"pc_normals"};
+		pcl::visualization::PCLVisualizer viewer{"Gaussian Sphere"};
 		/*cloud*/
 		pcl::PointCloud<pcl::PointXYZ>::Ptr cloud {new pcl::PointCloud<pcl::PointXYZ>};
 		pcl::PointCloud<pcl::PointNormal>::Ptr normals {new pcl::PointCloud<pcl::PointNormal>};
@@ -105,8 +105,8 @@ Eigen::MatrixXd PCFittingWalls::FrameRotation(geometry_msgs::Quaternion q, Eigen
 	if(!from_global_to_local)    q.w *= -1;
 	Eigen::MatrixXd Rot(3, 3); 
 	Rot <<	q.w*q.w + q.x*q.x - q.y*q.y - q.z*q.z,  2*(q.x*q.y + q.w*q.z),	2*(q.x*q.z - q.w*q.y),
-		2*(q.x*q.y - q.w*q.z),	q.w*q.w - q.x*q.x + q.y*q.y - q.z*q.z,	2*(q.y*q.z + q.w*q.x),
-		2*(q.x*q.z + q.w*q.y),	2*(q.y*q.z - q.w*q.x),	q.w*q.w - q.x*q.x - q.y*q.y + q.z*q.z;
+			2*(q.x*q.y - q.w*q.z),	q.w*q.w - q.x*q.x + q.y*q.y - q.z*q.z,	2*(q.y*q.z + q.w*q.x),
+			2*(q.x*q.z + q.w*q.y),	2*(q.y*q.z - q.w*q.x),	q.w*q.w - q.x*q.x - q.y*q.y + q.z*q.z;
 	// std::cout << "Rot*X = " << std::endl << Rot*X << std::endl;
 	if(from_global_to_local)    return Rot*X;
 	else    return Rot.inverse()*X;

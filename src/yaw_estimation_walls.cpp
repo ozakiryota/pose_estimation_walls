@@ -33,7 +33,7 @@ class YawEstimationWalls{
 			int count_nomatch;
 		};
 		/*pcl*/
-		pcl::visualization::PCLVisualizer viewer{"d-gaussian sphere"};
+		pcl::visualization::PCLVisualizer viewer{"D-Gaussian Sphere"};
 		pcl::KdTreeFLANN<pcl::PointXYZ> kdtree;
 		pcl::PointNormal g_vector_from_ekf;
 		pcl::PointCloud<pcl::PointXYZ>::Ptr cloud {new pcl::PointCloud<pcl::PointXYZ>};
@@ -123,7 +123,6 @@ void YawEstimationWalls::NormalEstimation(void)
 	// std::cout << "NORMAL ESTIMATION" << std::endl;
 	kdtree.setInputCloud(cloud);
 
-	// const size_t skip_step = 3;
 	const size_t skip_step = 3;
 	for(size_t i=0;i<cloud->points.size();i+=skip_step){
 		/*search neighbor points*/
@@ -136,9 +135,9 @@ void YawEstimationWalls::NormalEstimation(void)
 		indices = KdtreeSearch(cloud->points[i], search_radius);
 		
 		/*judge*/		
-		const size_t num_neighborpoints = 20;
-		if(indices.size()<num_neighborpoints){
-			// std::cout << ">> indices.size() = " << indices.size() << " < " << num_neighborpoints << ", then skip" << std::endl;
+		const size_t threshold_num_neighborpoints = 20;
+		if(indices.size()<threshold_num_neighborpoints){
+			// std::cout << ">> indices.size() = " << indices.size() << " < " << threshold_num_neighborpoints << ", then skip" << std::endl;
 			// continue;
 		}
 		/*compute normal*/
@@ -187,8 +186,7 @@ void YawEstimationWalls::NormalEstimation(void)
 			flipNormalTowardsViewpoint(cloud->points[i], 0.0, 0.0, 0.0, tmp_point.x, tmp_point.y, tmp_point.z);
 		}
 		d_gauss->points.push_back(tmp_point);
-		// for(int i=0;i<plane_parameters[3];i++)	d_gauss->points.push_back(tmp_point);
-		
+		// for(int j=0;j<indices.size()/threshold_num_neighborpoints;j++)	d_gauss->points.push_back(tmp_point);
 		normals->points.push_back(tmp_normal);
 	}
 }
@@ -326,7 +324,7 @@ bool YawEstimationWalls::MatchWalls(void)
 		return succeeded_matching;
 	}
 	else{
-		const double threshold_matching_distance = 0.5;
+		const double threshold_matching_distance = 1.5;
 		const int threshold_count_match = 5;
 		const int k = 1;
 		kdtree.setInputCloud(centroids_registered);
@@ -349,8 +347,13 @@ bool YawEstimationWalls::MatchWalls(void)
 						double tmp_local_pose_error_rpy[3];
 						tf::Matrix3x3(tmp_q_local_pose_error).getRPY(tmp_local_pose_error_rpy[0], tmp_local_pose_error_rpy[1], tmp_local_pose_error_rpy[2]);
 						for(int j=0;j<3;j++){
+							// local_pose_error_rpy_sincostan[j][0] += sin(tmp_local_pose_error_rpy[j]);
+							// local_pose_error_rpy_sincostan[j][1] += cos(tmp_local_pose_error_rpy[j]);
 							local_pose_error_rpy_sincostan[j][0] += list_walls[i].count_match*sin(tmp_local_pose_error_rpy[j]);
 							local_pose_error_rpy_sincostan[j][1] += list_walls[i].count_match*cos(tmp_local_pose_error_rpy[j]);
+							// double distance = sqrt(centroids_now->points[i].x*centroids_now->points[i].x + centroids_now->points[i].y*centroids_now->points[i].y + centroids_now->points[i].z*centroids_now->points[i].z);
+							// local_pose_error_rpy_sincostan[j][0] += distance*sin(tmp_local_pose_error_rpy[j]);
+							// local_pose_error_rpy_sincostan[j][1] += distance*cos(tmp_local_pose_error_rpy[j]);
 						}
 					}
 					succeeded_matching = true;
@@ -394,7 +397,6 @@ bool YawEstimationWalls::MatchWalls(void)
 void YawEstimationWalls::InputNewWallInfo(pcl::PointXYZ p)
 {
 	// std::cout << "INPUT NEW WALL INFO" << std::endl;
-
 	WallInfo tmp_wallinfo;
 	tmp_wallinfo.point = p;
 	tmp_wallinfo.odom = odom_now;
@@ -412,7 +414,6 @@ void YawEstimationWalls::InputNewWallInfo(pcl::PointXYZ p)
 void YawEstimationWalls::KalmanFilterForRegistration(WallInfo& wall)
 {
 	// std::cout << "KALMAN FILTER FOR REGISTRATION" << std::endl;
-
 	const int num_state = 3;
 	/*prediction*/
 	Eigen::MatrixXd A = Eigen::MatrixXd::Identity(num_state, num_state);
@@ -432,7 +433,7 @@ void YawEstimationWalls::KalmanFilterForRegistration(WallInfo& wall)
 			p.z;
 	Eigen::MatrixXd H = Eigen::MatrixXd::Identity(num_obs, num_state);
 	Eigen::MatrixXd jH = Eigen::MatrixXd::Identity(num_obs, num_state);
-	const double sigma_obs = 1.0e+100;
+	const double sigma_obs = 1.0e-1;
 	Eigen::MatrixXd R = sigma_obs*Eigen::MatrixXd::Identity(num_obs, num_obs);
 	Eigen::MatrixXd Y(num_obs, 1);
 	Eigen::MatrixXd S(num_obs, num_obs);
@@ -447,32 +448,33 @@ void YawEstimationWalls::KalmanFilterForRegistration(WallInfo& wall)
 	wall.point.x = wall.X(0, 0);
 	wall.point.y = wall.X(1, 0);
 	wall.point.z = wall.X(2, 0);
-	
+
+	// std::cout << "wall.X = " << std::endl << wall.X << std::endl;
 	// std::cout << "Y = " << std::endl << Y << std::endl;
 	// std::cout << "K*Y = " << std::endl << K*Y << std::endl;
 }
 
-// tf::Quaternion YawEstimationWalls::GetRelativeRotation(pcl::PointXYZ origin, pcl::PointXYZ target)
-// {
-// 	Eigen::Vector3d Origin(origin.x, origin.y, origin.z);
-// 	Eigen::Vector3d Target(target.x, target.y, target.z);
-// 	double theta = acos(Origin.dot(Target)/Origin.norm()/Target.norm());
-// 	Eigen::Vector3d Axis = Origin.cross(Target);
-// 	Axis.normalize();
-// 	tf::Quaternion relative_rotation(sin(theta/2.0)*Axis(0), sin(theta/2.0)*Axis(1), sin(theta/2.0)*Axis(2), cos(theta/2.0));
-// 	relative_rotation.normalize();
-// 	return relative_rotation;
-// }
 tf::Quaternion YawEstimationWalls::GetRelativeRotation(pcl::PointXYZ origin, pcl::PointXYZ target)
 {
-	tf::Quaternion q_point_origin(origin.x, origin.y, origin.z, 0.0);
-	tf::Quaternion q_point_target(target.x, target.y, target.z, 0.0);
-	q_point_origin.normalize();
-	q_point_target.normalize();
-	tf::Quaternion relative_rotation = q_point_target*q_point_origin.inverse();
+	Eigen::Vector3d Origin(origin.x, origin.y, origin.z);
+	Eigen::Vector3d Target(target.x, target.y, target.z);
+	double theta = acos(Origin.dot(Target)/Origin.norm()/Target.norm());
+	Eigen::Vector3d Axis = Origin.cross(Target);
+	Axis.normalize();
+	tf::Quaternion relative_rotation(sin(theta/2.0)*Axis(0), sin(theta/2.0)*Axis(1), sin(theta/2.0)*Axis(2), cos(theta/2.0));
 	relative_rotation.normalize();
 	return relative_rotation;
 }
+// tf::Quaternion YawEstimationWalls::GetRelativeRotation(pcl::PointXYZ origin, pcl::PointXYZ target)
+// {
+// 	tf::Quaternion q_point_origin(origin.x, origin.y, origin.z, 0.0);
+// 	tf::Quaternion q_point_target(target.x, target.y, target.z, 0.0);
+// 	q_point_origin.normalize();
+// 	q_point_target.normalize();
+// 	tf::Quaternion relative_rotation = q_point_target*q_point_origin.inverse();
+// 	relative_rotation.normalize();
+// 	return relative_rotation;
+// }
 
 void YawEstimationWalls::Visualization(void)
 {
@@ -492,11 +494,11 @@ void YawEstimationWalls::Visualization(void)
 	
 	viewer.addPointCloud(centroids_now, "centroids_now");
 	viewer.setPointCloudRenderingProperties (pcl::visualization::PCL_VISUALIZER_COLOR, 1.0, 1.0, 0.0, "centroids_now");
-	viewer.setPointCloudRenderingProperties (pcl::visualization::PCL_VISUALIZER_POINT_SIZE, 8, "centroids_now");
+	viewer.setPointCloudRenderingProperties (pcl::visualization::PCL_VISUALIZER_POINT_SIZE, 15, "centroids_now");
 	
 	viewer.addPointCloud(centroids_registered, "centroids_registered");
-	viewer.setPointCloudRenderingProperties (pcl::visualization::PCL_VISUALIZER_COLOR, 0.0, 1.0, 0.0, "centroids_registered");
-	viewer.setPointCloudRenderingProperties (pcl::visualization::PCL_VISUALIZER_POINT_SIZE, 8, "centroids_registered");
+	viewer.setPointCloudRenderingProperties (pcl::visualization::PCL_VISUALIZER_COLOR, 0.0, 0.8, 0.0, "centroids_registered");
+	viewer.setPointCloudRenderingProperties (pcl::visualization::PCL_VISUALIZER_POINT_SIZE, 15, "centroids_registered");
 	
 	viewer.spinOnce();
 }

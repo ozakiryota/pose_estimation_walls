@@ -1,32 +1,34 @@
 <launch>
+	<!-- global rosparam -->
 	<param name="use_sim_time" value="true"/>
-	
+
+	<!-- rosbag -->
 	<node pkg="rosbag" type="play" name="player" args="--clock /home/amsl/ozaki/bagfiles/velodyne_realsense/2018-10-06-12-14-59.bag -s 110"/>
 
+	<!-- rviz -->
 	<node pkg="rviz" type="rviz" name="rviz_startpoint" args="-d /home/amsl/.rviz/trajectories_startpoint.rviz"/>
 	<node pkg="rviz" type="rviz" name="rviz_skyview" args="-d /home/amsl/.rviz/trajectories_skyview.rviz"/>
 
+	<!-- sensor driver -->
 	<include file="$(find velodyne_pointcloud)/launch/32e_points.launch"/>
-	
-	<node pkg="image_transport" type="republish" name="republish" args="compressed raw">
-		<remap from="in" to="/camera/color/image_raw"/>
-		<remap from="out" to="/camera/color/image_raw"/>
-	</node>
+	<!-- <node pkg="image_transport" type="republish" name="republish" args="compressed raw"> -->
+	<!-- 	<remap from="in" to="/camera/color/image_raw"/> -->
+	<!-- 	<remap from="out" to="/camera/color/image_raw"/> -->
+	<!-- </node> -->
 
 	<!-- proposed method -->
 	<node pkg="pose_estimation_walls" name="imu_initial_alignment" type="imu_initial_alignment" output="screen"/>
 	<node pkg="pose_estimation_walls" name="pc_fittingwalls" type="pc_fittingwalls"/>
 	<node pkg="pose_estimation_walls" name="ekf_pose" type="ekf_pose" output="screen"/>
 	<node pkg="pose_estimation_walls" name="combine_linearvelocity_and_pose" type="combine_linearvelocity_and_pose"/>
-	<node pkg="pose_estimation_walls" name="yaw_estimation_walls_old_ver" type="yaw_estimation_walls_old_ver"/>
-	<node pkg="pose_estimation_walls" name="combine_linearvelocity_and_yawrate" type="combine_linearvelocity_and_yawrate"/>
-	
+	<node pkg="pose_estimation_walls" name="yaw_estimation_walls" type="yaw_estimation_walls"/>
+
 	<!-- comparisons	 -->
 	<include file="$(find loam_velodyne)/launch/hector_loam_velodyne.launch"/>
 	<node pkg="pose_estimation_walls" name="odom_creater_for_loamvelodyne" type="odom_creater_for_loamvelodyne"/>
 	<!-- <node pkg="pose_estimation_walls" name="odom_creater_for_lsdslam" type="odom_creater_for_lsdslam"/> -->
 	<node pkg="pose_estimation_walls" name="gyrodometry" type="gyrodometry"/>
-	
+
 	<!-- graph -->
 	<!-- <node pkg="pose_estimation_walls" name="graph_rpy" type="graph_rpy.py"/> -->
 </launch>
