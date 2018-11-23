@@ -26,8 +26,8 @@
 	<!-- comparisons	 -->
 	<include file="$(find loam_velodyne)/launch/hector_loam_velodyne.launch"/>
 	<node pkg="pose_estimation_walls" name="odom_creater_for_loamvelodyne" type="odom_creater_for_loamvelodyne"/>
-	<!-- <node pkg="pose_estimation_walls" name="odom_creater_for_lsdslam" type="odom_creater_for_lsdslam"/> -->
 	<node pkg="pose_estimation_walls" name="gyrodometry" type="gyrodometry"/>
+	<!-- <node pkg="pose_estimation_walls" name="odom_creater_for_lsdslam" type="odom_creater_for_lsdslam"/> -->
 
 	<!-- graph -->
 	<!-- <node pkg="pose_estimation_walls" name="graph_rpy" type="graph_rpy.py"/> -->

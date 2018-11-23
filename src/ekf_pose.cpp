@@ -132,6 +132,9 @@ void EKFPose::PredictionIMU(sensor_msgs::Imu imu, double dt)
 		delta_p -= bias.angular_velocity.y*dt;
 		delta_y -= bias.angular_velocity.z*dt;
 	}
+	delta_r = atan2(sin(delta_r), cos(delta_r));
+	delta_p = atan2(sin(delta_p), cos(delta_p));
+	delta_y = atan2(sin(delta_y), cos(delta_y));
 
 	Eigen::MatrixXd F(num_state, 1);
 	F <<	roll + (delta_r + sin(roll)*tan(pitch)*delta_p + cos(roll)*tan(pitch)*delta_y),
@@ -215,7 +218,7 @@ void EKFPose::ObservationSLAM(void)
 	Eigen::MatrixXd I = Eigen::MatrixXd::Identity(num_state, num_state);
 
 	Y = Z - H*X;
-	for(int i=0;i<3;i++){
+	for(int i=0;i<num_state;i++){
 		if(Y(i, 0)>M_PI)	Y(i, 0) -= 2.0*M_PI;
 		else if(Y(i, 0)<-M_PI)	Y(i, 0) += 2.0*M_PI;
 	}
@@ -224,7 +227,7 @@ void EKFPose::ObservationSLAM(void)
 	X = X + K*Y;
 	P = (I - K*jH)*P;
 
-	for(int i=0;i<3;i++){
+	for(int i=0;i<num_state;i++){
 		if(X(i, 0)>M_PI)	X(i, 0) -= 2.0*M_PI;
 		else if(X(i, 0)<-M_PI)	X(i, 0) += 2.0*M_PI;
 	}
@@ -288,14 +291,14 @@ void EKFPose::CallbackPoseDGauss(const geometry_msgs::PoseStampedConstPtr& msg)
 		Eigen::MatrixXd K(num_state, num_obs);
 		Eigen::MatrixXd I = Eigen::MatrixXd::Identity(num_state, num_state);
 		Y = Z - H*X;
-		for(int i=0;i<3;i++){
+		for(int i=0;i<num_state;i++){
 			if(Y(i, 0)>M_PI)	Y(i, 0) -= 2.0*M_PI;
 			else if(Y(i, 0)<-M_PI)	Y(i, 0) += 2.0*M_PI;
 		}
 		S = jH*P*jH.transpose() + R;
 		K = P*jH.transpose()*S.inverse();
 		X = X + K*Y;
-		for(int i=0;i<3;i++){
+		for(int i=0;i<num_state;i++){
 			if(X(i, 0)>M_PI)	X(i, 0) -= 2.0*M_PI;
 			else if(X(i, 0)<-M_PI)	X(i, 0) += 2.0*M_PI;
 		}
