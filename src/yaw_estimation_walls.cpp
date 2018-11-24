@@ -315,14 +315,13 @@ bool YawEstimationWalls::MatchWalls(void)
 	tf::Quaternion q_ave_local_pose_error;
 	bool compute_local_pose_error_in_quaternion = false;
 
-	std::cout << "list_walls.size() = " << list_walls.size() << std::endl;
+	std::cout << "list_walls.size() = " << list_walls.size() << " -------------------"<< std::endl;
 	if(list_walls.empty()){
 		for(size_t i=0;i<centroids_now->points.size();i++) InputNewWallInfo(centroids_now->points[i]);
 		return succeeded_matching;
 	}
 	else{
-		const double ratio_matching_distance = 0.3;
-		// const double ratio_matching_distance = 0.28;
+		const double ratio_matching_distance = 0.4;
 		const int threshold_count_match = 5;
 		const int k = 1;
 		kdtree.setInputCloud(centroids_registered);
@@ -457,9 +456,8 @@ void YawEstimationWalls::KalmanFilterForRegistration(WallInfo& wall)
 	wall.point.y = wall.X(1, 0);
 	wall.point.z = wall.X(2, 0);
 
-	std::cout << "Y: (" << Y(0, 0) << ", " << Y(1, 0) << ", " << Y(2, 0) << ")" << std::endl;
+	std::cout << "Y  : (" << Y(0, 0) << ", " << Y(1, 0) << ", " << Y(2, 0) << ")" << std::endl;
 	std::cout << "K*Y: (" << (K*Y)(0, 0) << ", " << (K*Y)(1, 0) << ", " << (K*Y)(2, 0) << ")" << std::endl;
-	std::cout << "K*Y = " << std::endl << K*Y << std::endl;
 }
 
 tf::Quaternion YawEstimationWalls::GetRelativeRotation(pcl::PointXYZ origin, pcl::PointXYZ target)
