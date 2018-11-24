@@ -321,7 +321,8 @@ bool YawEstimationWalls::MatchWalls(void)
 		return succeeded_matching;
 	}
 	else{
-		const double threshold_matching_distance = 1.0;
+		const double ratio_matching_distance = 0.3;
+		// const double ratio_matching_distance = 0.28;
 		const int threshold_count_match = 5;
 		const int k = 1;
 		kdtree.setInputCloud(centroids_registered);
@@ -329,6 +330,9 @@ bool YawEstimationWalls::MatchWalls(void)
 			std::vector<int> pointIdxNKNSearch(k);
 			std::vector<float> pointNKNSquaredDistance(k);
 			if(kdtree.nearestKSearch(centroids_now->points[i], k, pointIdxNKNSearch, pointNKNSquaredDistance)<=0)	std::cout << "kdtree error" << std::endl;
+			double point_depth = sqrt(centroids_now->points[i].x*centroids_now->points[i].x + centroids_now->points[i].y*centroids_now->points[i].y + centroids_now->points[i].z*centroids_now->points[i].z);
+			double threshold_matching_distance = ratio_matching_distance*point_depth;
+			if(!mode_dgauss)	threshold_matching_distance = 0.15;
 			if(sqrt(pointNKNSquaredDistance[0])<threshold_matching_distance && !list_walls[pointIdxNKNSearch[0]].found_match){
 				list_walls[pointIdxNKNSearch[0]].found_match = true;
 				list_walls[pointIdxNKNSearch[0]].count_match++;
@@ -385,6 +389,14 @@ bool YawEstimationWalls::MatchWalls(void)
 			quaternionMsgToTF(odom_now.pose.pose.orientation, q_pose_odom_now);
 			quaternionTFToMsg(q_pose_odom_now*q_ave_local_pose_error, pose_pub.pose.orientation);
 			std::cout << "succeeded matching" << std::endl;
+
+			double rpy[3];
+			tf::Matrix3x3(q_ave_local_pose_error).getRPY(rpy[0], rpy[1], rpy[2]);
+			std::cout << "q_ave_local_pose_error: " << rpy[0] << ", " << rpy[1] << ", " << rpy[2] << std::endl;
+			if(fabs(rpy[2])>M_PI/2.5){
+				std::cout << "fabs(rpy[2])>M_PI/2.5" << std::endl;
+				exit(1);
+			}
 		}
 		return succeeded_matching;
 	}
@@ -445,7 +457,8 @@ void YawEstimationWalls::KalmanFilterForRegistration(WallInfo& wall)
 	wall.point.y = wall.X(1, 0);
 	wall.point.z = wall.X(2, 0);
 
-	std::cout << "Y = " << std::endl << Y << std::endl;
+	std::cout << "Y: (" << Y(0, 0) << ", " << Y(1, 0) << ", " << Y(2, 0) << ")" << std::endl;
+	std::cout << "K*Y: (" << (K*Y)(0, 0) << ", " << (K*Y)(1, 0) << ", " << (K*Y)(2, 0) << ")" << std::endl;
 	std::cout << "K*Y = " << std::endl << K*Y << std::endl;
 }
 
@@ -458,14 +471,13 @@ tf::Quaternion YawEstimationWalls::GetRelativeRotation(pcl::PointXYZ origin, pcl
 	Axis.normalize();
 	tf::Quaternion relative_rotation(sin(theta/2.0)*Axis(0), sin(theta/2.0)*Axis(1), sin(theta/2.0)*Axis(2), cos(theta/2.0));
 	relative_rotation.normalize();
-
+	
 	double rpy[3];
 	tf::Matrix3x3(relative_rotation).getRPY(rpy[0], rpy[1], rpy[2]);
 	std::cout << "local error: " << rpy[0] << ", " << rpy[1] << ", " << rpy[2] << std::endl;
-	if(fabs(rpy[2])>M_PI){
-		std::cout << "fabs(rpy[2])>M_PI" << std::endl;
-		exit(1);
-	}
+	std::cout << "distance: " << (Target - Origin).norm() << std::endl;
+	std::cout << "Origin: (" << Origin(0) << ", " << Origin(1) << ", " << Origin(2) << "), depth = " << Origin.norm() << std::endl;
+	std::cout << "Target: (" << Target(0) << ", " << Target(1) << ", " << Target(2) << "), depth = " << Target.norm() << std::endl;
 
 	return relative_rotation;
 }
