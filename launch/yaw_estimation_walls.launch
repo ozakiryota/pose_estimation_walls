@@ -13,7 +13,7 @@
 	
 	<!-- proposed method -->
 	<node pkg="pose_estimation_walls" name="imu_initial_alignment" type="imu_initial_alignment" output="screen"/>
-	<node pkg="pose_estimation_walls" name="ekf_pose" type="ekf_pose"/>
+	<node pkg="pose_estimation_walls" name="ekf_pose_old_ver" type="ekf_pose_old_ver"/>
 	<node pkg="pose_estimation_walls" name="yaw_estimation_walls" type="yaw_estimation_walls" output="screen"/>
 	<node pkg="pose_estimation_walls" name="combine_linearvelocity_and_pose" type="combine_linearvelocity_and_pose"/>
 
