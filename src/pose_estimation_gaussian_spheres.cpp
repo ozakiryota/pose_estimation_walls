@@ -36,7 +36,7 @@ class PoseEstimationGaussianSphere{
 			int count_nomatch;
 		};
 		/*pcl*/
-		pcl::visualization::PCLVisualizer viewer{"D-Gaussian Sphere"};
+		pcl::visualization::PCLVisualizer viewer{"Gaussian Spheres"};
 		pcl::KdTreeFLANN<pcl::PointXYZ> kdtree;
 		pcl::PointNormal g_vector_from_ekf;
 		pcl::PointNormal g_vector_walls;
@@ -355,7 +355,7 @@ bool PoseEstimationGaussianSphere::GVectorEstimation(void)
 	g_vector_walls.normal_z /= norm_g;
 	/*convertion to roll, pitch*/
 	const double g = -9.80665;
-	rpy_pub.data[0] = atan2(g*g_vector_walls.normal_y, g*g_vector_walls.normal_y);
+	rpy_pub.data[0] = atan2(g*g_vector_walls.normal_y, g*g_vector_walls.normal_z);
 	rpy_pub.data[1] = atan2(-g*g_vector_walls.normal_x, sqrt(g*g_vector_walls.normal_y*g*g_vector_walls.normal_y + g*g_vector_walls.normal_z*g*g_vector_walls.normal_z));
 	return true;
 }
