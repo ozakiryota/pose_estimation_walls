@@ -73,7 +73,7 @@ class PoseEstimationGaussianSphere{
 		void ClusterGauss(void);
 		bool GVectorEstimation(void);
 		void PartialRotation(void);
-		void ClusterDGauss();
+		void ClusterDGauss(void);
 		void CreateRegisteredCentroidCloud(void);
 		pcl::PointXYZ PointTransformation(pcl::PointXYZ p, nav_msgs::Odometry origin, nav_msgs::Odometry target);
 		bool MatchWalls(void);
@@ -88,8 +88,8 @@ PoseEstimationGaussianSphere::PoseEstimationGaussianSphere()
 {
 	sub_pc = nh.subscribe("/velodyne_points", 1, &PoseEstimationGaussianSphere::CallbackPC, this);
 	sub_odom = nh.subscribe("/combined_odometry", 1, &PoseEstimationGaussianSphere::CallbackOdom, this);
-	pub_pose = nh.advertise<geometry_msgs::PoseStamped>("/pose_dgauss", 1);
 	pub_rpy = nh.advertise<std_msgs::Float64MultiArray>("/rpy_walls", 1);
+	pub_pose = nh.advertise<geometry_msgs::PoseStamped>("/pose_dgauss", 1);
 	viewer.setBackgroundColor(1, 1, 1);
 	viewer.addCoordinateSystem(0.5, "axis");
 	g_vector_from_ekf.x = 0.0;
@@ -264,8 +264,9 @@ double PoseEstimationGaussianSphere::ComputeSquareError(Eigen::Vector4f plane_pa
 void PoseEstimationGaussianSphere::ClusterGauss(void)
 {
 	// std::cout << "POINT CLUSTER" << std::endl;
+	// const double cluster_distance = 0.1;
 	const double cluster_distance = 0.1;
-	const int min_num_cluster_belongings = 30;
+	const int min_num_cluster_belongings = 60;
 	pcl::search::KdTree<pcl::PointXYZ>::Ptr tree (new pcl::search::KdTree<pcl::PointXYZ>);
 	tree->setInputCloud(gaussian_sphere);
 	std::vector<pcl::PointIndices> cluster_indices;
@@ -553,13 +554,9 @@ bool PoseEstimationGaussianSphere::MatchWalls(void)
 			std::cout << "succeeded matching" << std::endl;
 
 			double tmp_rpy[3];
-			tf::Matrix3x3(q_ave_local_pose_error).getRPY(tmp_rpy[0], tmp_rpy[1], tmp_rpy[2]);
+			tf::Matrix3x3(q_pose_odom_now*q_ave_local_pose_error).getRPY(tmp_rpy[0], tmp_rpy[1], tmp_rpy[2]);
 			rpy_pub.data[2] = tmp_rpy[2];
 			std::cout << "q_ave_local_pose_error: " << tmp_rpy[0] << ", " << tmp_rpy[1] << ", " << tmp_rpy[2] << std::endl;
-			// if(fabs(rpy[2])>M_PI/2.5){
-			// 	std::cout << "fabs(rpy[2])>M_PI/2.5" << std::endl;
-			// 	exit(1);
-			// }
 		}
 		return succeeded_y;
 	}
@@ -666,7 +663,7 @@ void PoseEstimationGaussianSphere::Visualization(void)
 
 	viewer.addPointCloudNormals<pcl::PointNormal>(gaussian_sphere_clustered_n, 1, 1.0, "gaussian_sphere_clustered_n");
 	viewer.setPointCloudRenderingProperties (pcl::visualization::PCL_VISUALIZER_COLOR, 1.0, 0.5, 0.0, "gaussian_sphere_clustered_n");
-	viewer.setPointCloudRenderingProperties (pcl::visualization::PCL_VISUALIZER_LINE_WIDTH, 3, "gaussian_sphere_clustered_n");
+	viewer.setPointCloudRenderingProperties (pcl::visualization::PCL_VISUALIZER_LINE_WIDTH, 5, "gaussian_sphere_clustered_n");
 
 	viewer.addPointCloud(d_gaussian_sphere, "d_gaussian_sphere");
 	viewer.setPointCloudRenderingProperties (pcl::visualization::PCL_VISUALIZER_COLOR, 1.0, 0.0, 0.8, "d_gaussian_sphere");
@@ -674,11 +671,11 @@ void PoseEstimationGaussianSphere::Visualization(void)
 	
 	viewer.addPointCloudNormals<pcl::PointNormal>(d_gaussian_sphere_clustered_n, 1, 1.0, "d_gaussian_sphere_clustered_n");
 	viewer.setPointCloudRenderingProperties (pcl::visualization::PCL_VISUALIZER_COLOR, 0.8, 0.0, 1.0, "d_gaussian_sphere_clustered_n");
-	viewer.setPointCloudRenderingProperties (pcl::visualization::PCL_VISUALIZER_LINE_WIDTH, 1.5, "d_gaussian_sphere_clustered_n");
+	viewer.setPointCloudRenderingProperties (pcl::visualization::PCL_VISUALIZER_LINE_WIDTH, 1, "d_gaussian_sphere_clustered_n");
 	
 	viewer.addPointCloudNormals<pcl::PointNormal>(d_gaussian_sphere_registered_n, 1, 1.0, "d_gaussian_sphere_registered_n");
-	viewer.setPointCloudRenderingProperties (pcl::visualization::PCL_VISUALIZER_COLOR, 0.8, 0.8, 0.0, "d_gaussian_sphere_registered_n");
-	viewer.setPointCloudRenderingProperties (pcl::visualization::PCL_VISUALIZER_LINE_WIDTH, 1.5, "d_gaussian_sphere_registered_n");
+	viewer.setPointCloudRenderingProperties (pcl::visualization::PCL_VISUALIZER_COLOR, 0.0, 0.5, 0.0, "d_gaussian_sphere_registered_n");
+	viewer.setPointCloudRenderingProperties (pcl::visualization::PCL_VISUALIZER_LINE_WIDTH, 1, "d_gaussian_sphere_registered_n");
 
 	pcl::PointCloud<pcl::PointNormal>::Ptr tmp_g_vector_walls {new pcl::PointCloud<pcl::PointNormal>};
 	tmp_g_vector_walls->points.push_back(g_vector_walls);
@@ -691,11 +688,11 @@ void PoseEstimationGaussianSphere::Visualization(void)
 
 void PoseEstimationGaussianSphere::Publication(void)
 {
+	pub_rpy.publish(rpy_pub);
+
 	pose_pub.header.frame_id = odom_now.header.frame_id;
 	pose_pub.header.stamp = time_pub;
 	pub_pose.publish(pose_pub);
-
-	pub_rpy.publish(rpy_pub);
 }
 
 int main(int argc, char** argv)

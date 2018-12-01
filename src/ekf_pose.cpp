@@ -37,7 +37,7 @@ class EKFPose{
 		bool bias_is_available = false;
 		bool first_callback_imu = true;
 		/*counter*/
-		int count_usingwalls = 0;
+		int count_rpy_walls = 0;
 		int count_slam = 0;
 		/*time*/
 		ros::Time time_imu_now;
@@ -228,14 +228,14 @@ void EKFPose::ObservationSLAM(void)
 		std::cout << "K*Y = " << std::endl << K*Y << std::endl;
 		std::cout << "P = " << std::endl << P << std::endl;
 	}
-	
 	q_pose = tf::createQuaternionFromRPY(X(0, 0), X(1, 0), X(2, 0));
 }
 
 void EKFPose::CallbackRPYWalls(const std_msgs::Float64MultiArrayConstPtr& msg)
 {
 	if(inipose_is_available){
-		std::cout << "Callback Pose D-Gauss" << std::endl;
+		count_rpy_walls++;
+		std::cout << count_rpy_walls << ": CALLBACK RPY WALLS" << std::endl;
 		int num_obs;
 		Eigen::MatrixXd Z;
 		Eigen::MatrixXd H;
