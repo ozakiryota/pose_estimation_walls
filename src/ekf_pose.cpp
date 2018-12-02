@@ -51,7 +51,7 @@ class EKFPose{
 		void CallbackSLAM(const geometry_msgs::PoseStampedConstPtr& msg);
 		void ObservationSLAM(void);
 		void CallbackRPYWalls(const std_msgs::Float64MultiArrayConstPtr& msg);
-		void Publisher();
+		void Publication();
 };
 
 EKFPose::EKFPose()
@@ -102,7 +102,7 @@ void EKFPose::CallbackIMU(const sensor_msgs::ImuConstPtr& msg)
 	if(first_callback_imu)	dt = 0.0;
 	else if(inipose_is_available)	PredictionIMU(*msg, dt);
 	
-	Publisher();
+	Publication();
 
 	first_callback_imu = false;
 }
@@ -144,7 +144,8 @@ void EKFPose::PredictionIMU(sensor_msgs::Imu imu, double dt)
 		for(int j=0;j<num_state;j++)    jF(i, j) = dfdx[i][j];
 	}
 	const double sigma = 1.0e-1;
-	Eigen::MatrixXd Q = sigma*Eigen::MatrixXd::Identity(num_state, num_state);
+	// Eigen::MatrixXd Q = sigma*Eigen::MatrixXd::Identity(num_state, num_state);
+	Eigen::MatrixXd Q(num_state, num_state);
 	Q <<	1.0e-1,	0, 0,
 	 		0,	1.0e-1,	0,
 			0,	0,	5.0e+5;
@@ -173,7 +174,7 @@ void EKFPose::CallbackSLAM(const geometry_msgs::PoseStampedConstPtr& msg)
 	q_slam_last = q_slam_now;
 	q_pose_last_at_slamcallback = q_pose;
 	
-	Publisher();
+	Publication();
 }
 
 void EKFPose::ObservationSLAM(void)
@@ -267,7 +268,8 @@ void EKFPose::CallbackRPYWalls(const std_msgs::Float64MultiArrayConstPtr& msg)
 					0,	0,	1;
 		}
 		Eigen::MatrixXd jH = H;
-		const double sigma = 1.0e+1;
+		// const double sigma = 1.0e+1;
+		const double sigma = 1.0e-1;
 		Eigen::MatrixXd R = sigma*Eigen::MatrixXd::Identity(num_obs, num_obs);
 		Eigen::MatrixXd Y(num_obs, 1);
 		Eigen::MatrixXd S(num_obs, num_obs);
@@ -291,9 +293,11 @@ void EKFPose::CallbackRPYWalls(const std_msgs::Float64MultiArrayConstPtr& msg)
 		std::cout << "K*Y = " << std::endl << K*Y << std::endl;
 	}
 	q_pose = tf::createQuaternionFromRPY(X(0, 0), X(1, 0), X(2, 0));
+
+	Publication();
 }
 
-void EKFPose::Publisher(void)
+void EKFPose::Publication(void)
 {
 	geometry_msgs::PoseStamped pose_out;
 	q_pose.normalize();

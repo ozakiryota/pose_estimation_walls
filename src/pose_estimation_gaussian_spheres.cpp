@@ -266,7 +266,7 @@ void PoseEstimationGaussianSphere::ClusterGauss(void)
 	// std::cout << "POINT CLUSTER" << std::endl;
 	// const double cluster_distance = 0.1;
 	const double cluster_distance = 0.1;
-	const int min_num_cluster_belongings = 60;
+	const int min_num_cluster_belongings = 70;
 	pcl::search::KdTree<pcl::PointXYZ>::Ptr tree (new pcl::search::KdTree<pcl::PointXYZ>);
 	tree->setInputCloud(gaussian_sphere);
 	std::vector<pcl::PointIndices> cluster_indices;
@@ -376,7 +376,7 @@ void PoseEstimationGaussianSphere::PartialRotation(void)
 void PoseEstimationGaussianSphere::ClusterDGauss(void)
 {
 	// std::cout << "POINT CLUSTER" << std::endl;
-	const double cluster_distance = 0.2;
+	const double cluster_distance = 0.3;
 	const int min_num_cluster_belongings = 20;
 	pcl::search::KdTree<pcl::PointXYZ>::Ptr tree (new pcl::search::KdTree<pcl::PointXYZ>);
 	tree->setInputCloud(d_gaussian_sphere);
@@ -486,7 +486,7 @@ bool PoseEstimationGaussianSphere::MatchWalls(void)
 		return succeeded_y;
 	}
 	else{
-		const double ratio_matching_distance = 0.4;
+		const double ratio_matching_distance = 0.08;
 		const int threshold_count_match = 5;
 		const int k = 1;
 		kdtree.setInputCloud(d_gaussian_sphere_registered);
@@ -532,7 +532,7 @@ bool PoseEstimationGaussianSphere::MatchWalls(void)
 			else	InputNewWallInfo(d_gaussian_sphere_clustered->points[i]);
 		}
 		/*arrange list*/
-		const int threshold_count_nomatch = 10;
+		const int threshold_count_nomatch = 5;
 		for(size_t i=0;i<list_walls.size();i++){
 			if(!list_walls[i].found_match)	list_walls[i].count_nomatch++;
 			if(list_walls[i].count_nomatch>threshold_count_nomatch){

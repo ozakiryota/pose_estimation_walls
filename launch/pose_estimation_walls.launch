@@ -7,7 +7,7 @@
 
 	<!-- rviz -->
 	<!-- <node pkg="rviz" type="rviz" name="rviz_startpoint" args="&#45;d /home/amsl/.rviz/trajectories_startpoint.rviz"/> -->
-	<!-- <node pkg="rviz" type="rviz" name="rviz_skyview" args="&#45;d /home/amsl/.rviz/trajectories_skyview.rviz"/> -->
+	<node pkg="rviz" type="rviz" name="rviz_skyview" args="-d /home/amsl/.rviz/trajectories_skyview.rviz"/>
 
 	<!-- sensor driver -->
 	<include file="$(find velodyne_pointcloud)/launch/32e_points.launch"/>
@@ -18,8 +18,8 @@
 
 	<!-- proposed method -->
 	<node pkg="pose_estimation_walls" name="imu_initial_alignment" type="imu_initial_alignment" output="screen"/>
-	<node pkg="pose_estimation_walls" name="ekf_pose" type="ekf_pose" output="screen"/>
-	<node pkg="pose_estimation_walls" name="pose_estimation_gaussian_spheres" type="pose_estimation_gaussian_spheres"/>
+	<node pkg="pose_estimation_walls" name="ekf_pose" type="ekf_pose"/>
+	<node pkg="pose_estimation_walls" name="pose_estimation_gaussian_spheres" type="pose_estimation_gaussian_spheres" output="screen"/>
 	<node pkg="pose_estimation_walls" name="combine_linearvelocity_and_pose" type="combine_linearvelocity_and_pose"/>
 
 	<!-- comparisons	 -->

@@ -17,7 +17,7 @@ class ImuInitialAlignment{
 		tf::TransformBroadcaster tf_broadcaster;
 		/*const*/
 		const int num_state = 3;
-		const double timelimit = 120.0;
+		const double timelimit = 120.0;	//[s]
 		/*objects*/
 		geometry_msgs::Quaternion initial_pose;
 		Eigen::MatrixXd X;
