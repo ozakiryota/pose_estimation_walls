@@ -174,7 +174,8 @@ void PoseEstimationGaussianSphere::FittingWalls(void)
 		if(search_radius<search_radius_min)	search_radius = search_radius_min;
 		indices = KdtreeSearch(cloud->points[i], search_radius);
 		/*judge*/
-		const size_t threshold_num_neighborpoints = 5;
+		// const size_t threshold_num_neighborpoints = 5;
+		const size_t threshold_num_neighborpoints = 30;
 		if(indices.size()<threshold_num_neighborpoints){
 			// std::cout << ">> indices.size() = " << indices.size() << " < " << threshold_num_neighborpoints << ", then skip" << std::endl;
 			continue;
@@ -471,6 +472,97 @@ pcl::PointXYZ PoseEstimationGaussianSphere::PointTransformation(pcl::PointXYZ p,
 	return p_;
 }
 
+// bool PoseEstimationGaussianSphere::MatchWalls(void)
+// {
+// 	// std::cout << "MATCH WALLS" << std::endl;
+//
+// 	bool succeeded_y = false;
+// 	double local_pose_error_rpy_sincosatan[3][3] = {};
+// 	tf::Quaternion q_ave_local_pose_error;
+// 	bool compute_local_pose_error_in_quaternion = false;
+//
+// 	std::cout << "list_walls.size() = " << list_walls.size() << " -------------------"<< std::endl;
+// 	if(list_walls.empty()){
+// 		for(size_t i=0;i<d_gaussian_sphere_clustered->points.size();i++) InputNewWallInfo(d_gaussian_sphere_clustered->points[i]);
+// 		return succeeded_y;
+// 	}
+// 	else{
+// 		const double ratio_matching_distance = 0.08;
+// 		const int threshold_count_match = 5;
+// 		const int k = 1;
+// 		kdtree.setInputCloud(d_gaussian_sphere_registered);
+// 		for(size_t i=0;i<d_gaussian_sphere_clustered->points.size();i++){
+// 			std::vector<int> pointIdxNKNSearch(k);
+// 			std::vector<float> pointNKNSquaredDistance(k);
+// 			if(kdtree.nearestKSearch(d_gaussian_sphere_clustered->points[i], k, pointIdxNKNSearch, pointNKNSquaredDistance)<=0)	std::cout << "kdtree error" << std::endl;
+// 			double point_depth = sqrt(d_gaussian_sphere_clustered->points[i].x*d_gaussian_sphere_clustered->points[i].x + d_gaussian_sphere_clustered->points[i].y*d_gaussian_sphere_clustered->points[i].y + d_gaussian_sphere_clustered->points[i].z*d_gaussian_sphere_clustered->points[i].z);
+// 			double threshold_matching_distance = ratio_matching_distance*point_depth;
+// 			if(sqrt(pointNKNSquaredDistance[0])<threshold_matching_distance && !list_walls[pointIdxNKNSearch[0]].found_match){
+// 				list_walls[pointIdxNKNSearch[0]].found_match = true;
+// 				list_walls[pointIdxNKNSearch[0]].count_match++;
+// 				list_walls[pointIdxNKNSearch[0]].count_nomatch = 0;
+// 				if(list_walls[pointIdxNKNSearch[0]].fixed){
+// 					tf::Quaternion tmp_q_local_pose_error = GetRelativeRotation(d_gaussian_sphere_clustered->points[i], d_gaussian_sphere_registered->points[pointIdxNKNSearch[0]]);
+// 					if(compute_local_pose_error_in_quaternion){
+// 						tmp_q_local_pose_error = tf::Quaternion(list_walls[pointIdxNKNSearch[0]].count_match*tmp_q_local_pose_error.x(), list_walls[pointIdxNKNSearch[0]].count_match*tmp_q_local_pose_error.y(), list_walls[pointIdxNKNSearch[0]].count_match*tmp_q_local_pose_error.z(), list_walls[pointIdxNKNSearch[0]].count_match*tmp_q_local_pose_error.w());
+// 						if(!succeeded_y)	q_ave_local_pose_error = tmp_q_local_pose_error;
+// 						else	q_ave_local_pose_error += tmp_q_local_pose_error;
+// 					}
+// 					else{
+// 						double tmp_local_pose_error_rpy[3];
+// 						tf::Matrix3x3(tmp_q_local_pose_error).getRPY(tmp_local_pose_error_rpy[0], tmp_local_pose_error_rpy[1], tmp_local_pose_error_rpy[2]);
+// 						for(int j=0;j<3;j++){
+// 							// local_pose_error_rpy_sincosatan[j][0] += sin(tmp_local_pose_error_rpy[j]);
+// 							// local_pose_error_rpy_sincosatan[j][1] += cos(tmp_local_pose_error_rpy[j]);
+// 							local_pose_error_rpy_sincosatan[j][0] += list_walls[pointIdxNKNSearch[0]].count_match*sin(tmp_local_pose_error_rpy[j]);
+// 							local_pose_error_rpy_sincosatan[j][1] += list_walls[pointIdxNKNSearch[0]].count_match*cos(tmp_local_pose_error_rpy[j]);
+// 							// double distance = sqrt(d_gaussian_sphere_clustered->points[i].x*d_gaussian_sphere_clustered->points[i].x + d_gaussian_sphere_clustered->points[i].y*d_gaussian_sphere_clustered->points[i].y + d_gaussian_sphere_clustered->points[i].z*d_gaussian_sphere_clustered->points[i].z);
+// 							// local_pose_error_rpy_sincosatan[j][0] += distance*sin(tmp_local_pose_error_rpy[j]);
+// 							// local_pose_error_rpy_sincosatan[j][1] += distance*cos(tmp_local_pose_error_rpy[j]);
+// 						}
+// 					}
+// 					succeeded_y = true;
+// 					std::cout << "list_walls[" << pointIdxNKNSearch[0] << "].count_match = " << list_walls[pointIdxNKNSearch[0]].count_match << std::endl;
+// 				}
+// 				else{
+// 					list_walls[pointIdxNKNSearch[0]].point = d_gaussian_sphere_clustered->points[i];
+// 					KalmanFilterForRegistration(list_walls[pointIdxNKNSearch[0]]);
+// 					if(list_walls[pointIdxNKNSearch[0]].count_match>threshold_count_match)	list_walls[pointIdxNKNSearch[0]].fixed = true;
+// 				}
+// 			}
+// 			else	InputNewWallInfo(d_gaussian_sphere_clustered->points[i]);
+// 		}
+// 		#<{(|arrange list|)}>#
+// 		const int threshold_count_nomatch = 5;
+// 		for(size_t i=0;i<list_walls.size();i++){
+// 			if(!list_walls[i].found_match)	list_walls[i].count_nomatch++;
+// 			if(list_walls[i].count_nomatch>threshold_count_nomatch){
+// 				list_walls.erase(list_walls.begin() + i);
+// 				i--;
+// 			}
+// 			else	list_walls[i].found_match = false;
+// 		}
+// 		#<{(|estimate pose|)}>#
+// 		if(succeeded_y){
+// 			if(!compute_local_pose_error_in_quaternion){
+// 				for(int j=0;j<3;j++)	local_pose_error_rpy_sincosatan[j][2] = atan2(local_pose_error_rpy_sincosatan[j][0], local_pose_error_rpy_sincosatan[j][1]);
+// 				q_ave_local_pose_error = tf::createQuaternionFromRPY(local_pose_error_rpy_sincosatan[0][2], local_pose_error_rpy_sincosatan[1][2], local_pose_error_rpy_sincosatan[2][2]);
+// 			}
+// 			q_ave_local_pose_error.normalize();
+// 			tf::Quaternion q_pose_odom_now;
+// 			quaternionMsgToTF(odom_now.pose.pose.orientation, q_pose_odom_now);
+// 			quaternionTFToMsg(q_pose_odom_now*q_ave_local_pose_error, pose_pub.pose.orientation);
+// 			std::cout << "succeeded matching" << std::endl;
+//
+// 			double tmp_rpy[3];
+// 			tf::Matrix3x3(q_pose_odom_now*q_ave_local_pose_error).getRPY(tmp_rpy[0], tmp_rpy[1], tmp_rpy[2]);
+// 			rpy_pub.data[2] = tmp_rpy[2];
+// 			std::cout << "q_ave_local_pose_error: " << tmp_rpy[0] << ", " << tmp_rpy[1] << ", " << tmp_rpy[2] << std::endl;
+// 		}
+// 		return succeeded_y;
+// 	}
+// }
+
 bool PoseEstimationGaussianSphere::MatchWalls(void)
 {
 	// std::cout << "MATCH WALLS" << std::endl;
@@ -480,13 +572,16 @@ bool PoseEstimationGaussianSphere::MatchWalls(void)
 	tf::Quaternion q_ave_local_pose_error;
 	bool compute_local_pose_error_in_quaternion = false;
 
-	std::cout << "list_walls.size() = " << list_walls.size() << " -------------------"<< std::endl;
+	std::cout << "-------------------" << std::endl << "list_walls.size() = " << list_walls.size() << std::endl;
 	if(list_walls.empty()){
 		for(size_t i=0;i<d_gaussian_sphere_clustered->points.size();i++) InputNewWallInfo(d_gaussian_sphere_clustered->points[i]);
 		return succeeded_y;
 	}
 	else{
-		const double ratio_matching_distance = 0.08;
+		// const double ratio_matching_norm_dif = 0.1;
+		// const double min_matching_norm_dif = 0.5;	//[m]
+		const double threshold_matching_norm_dif = 1.0;	//[m]
+		const double threshold_matching_angle = 15.0;	//[deg]
 		const int threshold_count_match = 5;
 		const int k = 1;
 		kdtree.setInputCloud(d_gaussian_sphere_registered);
@@ -494,9 +589,12 @@ bool PoseEstimationGaussianSphere::MatchWalls(void)
 			std::vector<int> pointIdxNKNSearch(k);
 			std::vector<float> pointNKNSquaredDistance(k);
 			if(kdtree.nearestKSearch(d_gaussian_sphere_clustered->points[i], k, pointIdxNKNSearch, pointNKNSquaredDistance)<=0)	std::cout << "kdtree error" << std::endl;
-			double point_depth = sqrt(d_gaussian_sphere_clustered->points[i].x*d_gaussian_sphere_clustered->points[i].x + d_gaussian_sphere_clustered->points[i].y*d_gaussian_sphere_clustered->points[i].y + d_gaussian_sphere_clustered->points[i].z*d_gaussian_sphere_clustered->points[i].z);
-			double threshold_matching_distance = ratio_matching_distance*point_depth;
-			if(sqrt(pointNKNSquaredDistance[0])<threshold_matching_distance && !list_walls[pointIdxNKNSearch[0]].found_match){
+			double norm_clusterd = sqrt(d_gaussian_sphere_clustered->points[i].x*d_gaussian_sphere_clustered->points[i].x + d_gaussian_sphere_clustered->points[i].y*d_gaussian_sphere_clustered->points[i].y + d_gaussian_sphere_clustered->points[i].z*d_gaussian_sphere_clustered->points[i].z);
+			double norm_registered = sqrt(d_gaussian_sphere_registered->points[pointIdxNKNSearch[0]].x*d_gaussian_sphere_registered->points[pointIdxNKNSearch[0]].x + d_gaussian_sphere_registered->points[pointIdxNKNSearch[0]].y*d_gaussian_sphere_registered->points[pointIdxNKNSearch[0]].y + d_gaussian_sphere_registered->points[pointIdxNKNSearch[0]].z*d_gaussian_sphere_registered->points[pointIdxNKNSearch[0]].z); 
+			double angle = acos((d_gaussian_sphere_clustered->points[i].x*d_gaussian_sphere_registered->points[pointIdxNKNSearch[0]].x + d_gaussian_sphere_clustered->points[i].y*d_gaussian_sphere_registered->points[pointIdxNKNSearch[0]].y + d_gaussian_sphere_clustered->points[i].z*d_gaussian_sphere_registered->points[pointIdxNKNSearch[0]].z)/norm_clusterd/norm_registered);
+			// double threshold_matching_norm_dif = ratio_matching_norm_dif*norm_clusterd;
+			// if(threshold_matching_norm_dif<min_matching_norm_dif)	threshold_matching_norm_dif = min_matching_norm_dif;
+			if(fabs(norm_clusterd-norm_registered)<threshold_matching_norm_dif && fabs(angle/M_PI*180.0)<threshold_matching_angle && !list_walls[pointIdxNKNSearch[0]].found_match){
 				list_walls[pointIdxNKNSearch[0]].found_match = true;
 				list_walls[pointIdxNKNSearch[0]].count_match++;
 				list_walls[pointIdxNKNSearch[0]].count_nomatch = 0;

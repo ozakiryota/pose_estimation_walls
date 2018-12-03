@@ -240,12 +240,15 @@ void EKFPose::CallbackRPYWalls(const std_msgs::Float64MultiArrayConstPtr& msg)
 		int num_obs;
 		Eigen::MatrixXd Z;
 		Eigen::MatrixXd H;
+		Eigen::MatrixXd R;
 		if(std::isnan(msg->data[0]) && std::isnan(msg->data[1])){
 			num_obs = 1;
 			Z = Eigen::MatrixXd(num_obs, 1);
 			Z <<	msg->data[2];
 			H = Eigen::MatrixXd(num_obs, num_state);
 			H <<	0,	0,	1;
+			R = Eigen::MatrixXd(num_obs, num_obs);
+			R <<	1.0e-1;
 		}
 		else if(std::isnan(msg->data[2])){
 			num_obs = 2;
@@ -255,6 +258,9 @@ void EKFPose::CallbackRPYWalls(const std_msgs::Float64MultiArrayConstPtr& msg)
 			H = Eigen::MatrixXd(num_obs, num_state);
 			H <<	1,	0,	0,
 			  		0,	1,	0;
+			R = Eigen::MatrixXd(num_obs, num_obs);
+			R <<	1.0e+1,	0.0,
+			  		0.0,	1.0e+1;
 		}
 		else{
 			num_obs = 3;
@@ -266,11 +272,14 @@ void EKFPose::CallbackRPYWalls(const std_msgs::Float64MultiArrayConstPtr& msg)
 			H <<	1,	0,	0,
 			  		0,	1,	0,
 					0,	0,	1;
+			R = Eigen::MatrixXd(num_obs, num_obs);
+			R <<	1.0e+1,	0.0,	0.0,
+					0.0,	1.0e+1,	0.0,
+					0.0,	0.0,	1.0e-1;
 		}
 		Eigen::MatrixXd jH = H;
 		// const double sigma = 1.0e+1;
-		const double sigma = 1.0e-1;
-		Eigen::MatrixXd R = sigma*Eigen::MatrixXd::Identity(num_obs, num_obs);
+		// Eigen::MatrixXd R = sigma*Eigen::MatrixXd::Identity(num_obs, num_obs);
 		Eigen::MatrixXd Y(num_obs, 1);
 		Eigen::MatrixXd S(num_obs, num_obs);
 		Eigen::MatrixXd K(num_state, num_obs);

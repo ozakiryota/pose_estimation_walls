@@ -10,6 +10,7 @@ class OdomPrinter{
 		ros::Subscriber sub_inipose;
 		ros::Subscriber sub_odom1;
 		ros::Subscriber sub_odom2;
+		ros::Subscriber sub_odom3;
 		/*objects*/
 		double inipose_rpy[3] = {};
 	public:
@@ -17,6 +18,7 @@ class OdomPrinter{
 		void CallbackInipose(const geometry_msgs::QuaternionConstPtr& msg);
 		void CallbackOdom1(const nav_msgs::OdometryConstPtr& msg);
 		void CallbackOdom2(const nav_msgs::OdometryConstPtr& msg);
+		void CallbackOdom3(const nav_msgs::OdometryConstPtr& msg);
 		void Print(nav_msgs::Odometry odom);
 };
 
@@ -25,6 +27,7 @@ OdomPrinter::OdomPrinter()
 	sub_inipose = nh.subscribe("/initial_pose", 1, &OdomPrinter::CallbackOdom1, this);
 	sub_odom1 = nh.subscribe("/combined_odometry", 1, &OdomPrinter::CallbackOdom1, this);
 	sub_odom2 = nh.subscribe("/gyrodometry", 1, &OdomPrinter::CallbackOdom2, this);
+	sub_odom3 = nh.subscribe("/loamvelodyne_odometry", 1, &OdomPrinter::CallbackOdom3, this);
 }
 
 void OdomPrinter::CallbackInipose(const geometry_msgs::QuaternionConstPtr& msg)
@@ -40,6 +43,11 @@ void OdomPrinter::CallbackOdom1(const nav_msgs::OdometryConstPtr& msg)
 }
 
 void OdomPrinter::CallbackOdom2(const nav_msgs::OdometryConstPtr& msg)
+{
+	Print(*msg);
+}
+
+void OdomPrinter::CallbackOdom3(const nav_msgs::OdometryConstPtr& msg)
 {
 	Print(*msg);
 }

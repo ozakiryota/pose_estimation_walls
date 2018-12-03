@@ -25,6 +25,7 @@ void OdomCreaterForLoamVelodyne::Callback(const nav_msgs::OdometryConstPtr& msg)
 {
 	odom_out = *msg;
 	odom_out.header.frame_id = "/odom";
+	odom_out.child_frame_id = "/loamvelodyne_odometry";
 	odom_out.pose.pose.position.x = msg->pose.pose.position.z;
 	odom_out.pose.pose.position.y = msg->pose.pose.position.x;
 	odom_out.pose.pose.position.z = msg->pose.pose.position.y;
