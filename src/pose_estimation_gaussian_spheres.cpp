@@ -168,14 +168,16 @@ void PoseEstimationGaussianSphere::FittingWalls(void)
 		/*search neighbor points*/
 		std::vector<int> indices;
 		double laser_distance = sqrt(cloud->points[i].x*cloud->points[i].x + cloud->points[i].y*cloud->points[i].y + cloud->points[i].z*cloud->points[i].z);
+		// const double search_radius_min = 0.3;
+		// const double ratio = 0.06;
 		const double search_radius_min = 0.3;
-		const double ratio = 0.06;
+		const double ratio = 0.09;
 		double search_radius = ratio*laser_distance;
 		if(search_radius<search_radius_min)	search_radius = search_radius_min;
 		indices = KdtreeSearch(cloud->points[i], search_radius);
 		/*judge*/
 		// const size_t threshold_num_neighborpoints = 5;
-		const size_t threshold_num_neighborpoints = 50;
+		const size_t threshold_num_neighborpoints = 30;
 		if(indices.size()<threshold_num_neighborpoints){
 			// std::cout << ">> indices.size() = " << indices.size() << " < " << threshold_num_neighborpoints << ", then skip" << std::endl;
 			continue;
@@ -197,7 +199,7 @@ void PoseEstimationGaussianSphere::FittingWalls(void)
 		normals->points.push_back(tmp_normal);
 		/*judge*/
 		const double threshold_angle = 30.0;	//[deg]
-		if(fabs(AngleBetweenVectors(tmp_normal, g_vector_from_ekf)-M_PI/2.0)>threshold_angle/180.0*M_PI){
+		if(fabs(fabs(AngleBetweenVectors(tmp_normal, g_vector_from_ekf))-M_PI/2.0)>threshold_angle/180.0*M_PI){
 			// std::cout << ">> angle from square angle = " << fabs(AngleBetweenVectors(tmp_normal, g_vector_from_ekf->points[0])-M_PI/2.0) << " > " << threshold_angle << ", then skip" << std::endl;
 			continue;
 		}
@@ -266,8 +268,9 @@ void PoseEstimationGaussianSphere::ClusterGauss(void)
 {
 	// std::cout << "POINT CLUSTER" << std::endl;
 	// const double cluster_distance = 0.1;
+	// const int min_num_cluster_belongings = 70;
 	const double cluster_distance = 0.1;
-	const int min_num_cluster_belongings = 70;
+	const int min_num_cluster_belongings = 60;
 	pcl::search::KdTree<pcl::PointXYZ>::Ptr tree (new pcl::search::KdTree<pcl::PointXYZ>);
 	tree->setInputCloud(gaussian_sphere);
 	std::vector<pcl::PointIndices> cluster_indices;
@@ -356,9 +359,8 @@ bool PoseEstimationGaussianSphere::GVectorEstimation(void)
 	g_vector_walls.normal_y /= norm_g;
 	g_vector_walls.normal_z /= norm_g;
 	/*convertion to roll, pitch*/
-	const double g = -9.80665;
-	rpy_pub.data[0] = atan2(g*g_vector_walls.normal_y, g*g_vector_walls.normal_z);
-	rpy_pub.data[1] = atan2(-g*g_vector_walls.normal_x, sqrt(g*g_vector_walls.normal_y*g*g_vector_walls.normal_y + g*g_vector_walls.normal_z*g*g_vector_walls.normal_z));
+	rpy_pub.data[0] = atan2(-g_vector_walls.normal_y, -g_vector_walls.normal_z);
+	rpy_pub.data[1] = atan2(g_vector_walls.normal_x, sqrt(-g_vector_walls.normal_y*-g_vector_walls.normal_y + -g_vector_walls.normal_z*-g_vector_walls.normal_z));
 	return true;
 }
 

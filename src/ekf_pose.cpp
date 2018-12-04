@@ -232,54 +232,92 @@ void EKFPose::ObservationSLAM(void)
 	q_pose = tf::createQuaternionFromRPY(X(0, 0), X(1, 0), X(2, 0));
 }
 
+// void EKFPose::CallbackRPYWalls(const std_msgs::Float64MultiArrayConstPtr& msg)
+// {
+// 	if(inipose_is_available){
+// 		count_rpy_walls++;
+// 		std::cout << count_rpy_walls << ": CALLBACK RPY WALLS" << std::endl;
+// 		int num_obs;
+// 		Eigen::MatrixXd Z;
+// 		Eigen::MatrixXd H;
+// 		Eigen::MatrixXd R;
+// 		if(std::isnan(msg->data[0]) && std::isnan(msg->data[1])){
+// 			num_obs = 1;
+// 			Z = Eigen::MatrixXd(num_obs, 1);
+// 			Z <<	msg->data[2];
+// 			H = Eigen::MatrixXd(num_obs, num_state);
+// 			H <<	0,	0,	1;
+// 			R = Eigen::MatrixXd(num_obs, num_obs);
+// 			R <<	1.0e-1;
+// 		}
+// 		else if(std::isnan(msg->data[2])){
+// 			num_obs = 2;
+// 			Z = Eigen::MatrixXd(num_obs, 1);
+// 			Z <<	msg->data[0],
+// 					msg->data[1];
+// 			H = Eigen::MatrixXd(num_obs, num_state);
+// 			H <<	1,	0,	0,
+// 			  		0,	1,	0;
+// 			R = Eigen::MatrixXd(num_obs, num_obs);
+// 			R <<	1.0e+1,	0.0,
+// 			  		0.0,	1.0e+1;
+// 		}
+// 		else{
+// 			num_obs = 3;
+// 			Z = Eigen::MatrixXd(num_obs, 1);
+// 			Z <<	msg->data[0],
+// 					msg->data[1],
+// 					msg->data[2];
+// 			H = Eigen::MatrixXd(num_obs, num_state);
+// 			H <<	1,	0,	0,
+// 			  		0,	1,	0,
+// 					0,	0,	1;
+// 			R = Eigen::MatrixXd(num_obs, num_obs);
+// 			R <<	1.0e+1,	0.0,	0.0,
+// 					0.0,	1.0e+1,	0.0,
+// 					0.0,	0.0,	1.0e-1;
+// 		}
+// 		Eigen::MatrixXd jH = H;
+// 		Eigen::MatrixXd Y(num_obs, 1);
+// 		Eigen::MatrixXd S(num_obs, num_obs);
+// 		Eigen::MatrixXd K(num_state, num_obs);
+// 		Eigen::MatrixXd I = Eigen::MatrixXd::Identity(num_state, num_state);
+// 		Y = Z - H*X;
+// 		for(int i=0;i<num_obs;i++){
+// 			if(Y(i, 0)>M_PI)	Y(i, 0) -= 2.0*M_PI;
+// 			else if(Y(i, 0)<-M_PI)	Y(i, 0) += 2.0*M_PI;
+// 		}
+// 		S = jH*P*jH.transpose() + R;
+// 		K = P*jH.transpose()*S.inverse();
+// 		X = X + K*Y;
+// 		for(int i=0;i<num_state;i++){
+// 			if(X(i, 0)>M_PI)	X(i, 0) -= 2.0*M_PI;
+// 			else if(X(i, 0)<-M_PI)	X(i, 0) += 2.0*M_PI;
+// 		}
+// 		P = (I - K*jH)*P;
+//
+// 		std::cout << "Y = " << std::endl << Y << std::endl;
+// 		std::cout << "K*Y = " << std::endl << K*Y << std::endl;
+// 	}
+// 	q_pose = tf::createQuaternionFromRPY(X(0, 0), X(1, 0), X(2, 0));
+//
+// 	Publication();
+// }
 void EKFPose::CallbackRPYWalls(const std_msgs::Float64MultiArrayConstPtr& msg)
 {
 	if(inipose_is_available){
 		count_rpy_walls++;
 		std::cout << count_rpy_walls << ": CALLBACK RPY WALLS" << std::endl;
-		int num_obs;
-		Eigen::MatrixXd Z;
-		Eigen::MatrixXd H;
-		Eigen::MatrixXd R;
-		if(std::isnan(msg->data[0]) && std::isnan(msg->data[1])){
-			num_obs = 1;
-			Z = Eigen::MatrixXd(num_obs, 1);
-			Z <<	msg->data[2];
-			H = Eigen::MatrixXd(num_obs, num_state);
-			H <<	0,	0,	1;
-			R = Eigen::MatrixXd(num_obs, num_obs);
-			R <<	1.0e-1;
+		const int num_obs = 3;
+		Eigen::MatrixXd Z(num_obs, 1);
+		for(int i=0;i<num_obs;i++){
+			if(!std::isnan(msg->data[i]))	Z(i, 0) = msg->data[i];
+			else	Z(i, 0) = X(i, 0);
 		}
-		else if(std::isnan(msg->data[2])){
-			num_obs = 2;
-			Z = Eigen::MatrixXd(num_obs, 1);
-			Z <<	msg->data[0],
-					msg->data[1];
-			H = Eigen::MatrixXd(num_obs, num_state);
-			H <<	1,	0,	0,
-			  		0,	1,	0;
-			R = Eigen::MatrixXd(num_obs, num_obs);
-			R <<	1.0e+1,	0.0,
-			  		0.0,	1.0e+1;
-		}
-		else{
-			num_obs = 3;
-			Z = Eigen::MatrixXd(num_obs, 1);
-			Z <<	msg->data[0],
-					msg->data[1],
-					msg->data[2];
-			H = Eigen::MatrixXd(num_obs, num_state);
-			H <<	1,	0,	0,
-			  		0,	1,	0,
-					0,	0,	1;
-			R = Eigen::MatrixXd(num_obs, num_obs);
-			R <<	1.0e+1,	0.0,	0.0,
-					0.0,	1.0e+1,	0.0,
-					0.0,	0.0,	1.0e-1;
-		}
+		Eigen::MatrixXd H = Eigen::MatrixXd::Identity(num_obs, num_state);
 		Eigen::MatrixXd jH = H;
-		// const double sigma = 1.0e+1;
-		// Eigen::MatrixXd R = sigma*Eigen::MatrixXd::Identity(num_obs, num_obs);
+		const double sigma = 1.0e+1;
+		Eigen::MatrixXd R = sigma*Eigen::MatrixXd::Identity(num_obs, num_obs);
 		Eigen::MatrixXd Y(num_obs, 1);
 		Eigen::MatrixXd S(num_obs, num_obs);
 		Eigen::MatrixXd K(num_state, num_obs);
