@@ -168,16 +168,13 @@ void PoseEstimationGaussianSphere::FittingWalls(void)
 		/*search neighbor points*/
 		std::vector<int> indices;
 		double laser_distance = sqrt(cloud->points[i].x*cloud->points[i].x + cloud->points[i].y*cloud->points[i].y + cloud->points[i].z*cloud->points[i].z);
-		// const double search_radius_min = 0.3;
-		// const double ratio = 0.06;
 		const double search_radius_min = 0.3;
 		const double ratio = 0.09;
 		double search_radius = ratio*laser_distance;
 		if(search_radius<search_radius_min)	search_radius = search_radius_min;
 		indices = KdtreeSearch(cloud->points[i], search_radius);
 		/*judge*/
-		// const size_t threshold_num_neighborpoints = 5;
-		const size_t threshold_num_neighborpoints = 30;
+		const size_t threshold_num_neighborpoints = 20;
 		if(indices.size()<threshold_num_neighborpoints){
 			// std::cout << ">> indices.size() = " << indices.size() << " < " << threshold_num_neighborpoints << ", then skip" << std::endl;
 			continue;
@@ -267,8 +264,6 @@ double PoseEstimationGaussianSphere::ComputeSquareError(Eigen::Vector4f plane_pa
 void PoseEstimationGaussianSphere::ClusterGauss(void)
 {
 	// std::cout << "POINT CLUSTER" << std::endl;
-	// const double cluster_distance = 0.1;
-	// const int min_num_cluster_belongings = 70;
 	const double cluster_distance = 0.1;
 	const int min_num_cluster_belongings = 60;
 	pcl::search::KdTree<pcl::PointXYZ>::Ptr tree (new pcl::search::KdTree<pcl::PointXYZ>);
