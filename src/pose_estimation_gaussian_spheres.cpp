@@ -158,13 +158,86 @@ void PoseEstimationGaussianSphere::ClearPoints(void)
 	d_gaussian_sphere_registered_n->points.clear();
 }
 
+// void PoseEstimationGaussianSphere::FittingWalls(void)
+// {
+// 	// std::cout << "NORMAL ESTIMATION" << std::endl;
+//
+// 	kdtree.setInputCloud(cloud);
+//
+// 	const size_t skip_step = 3;
+// 	for(size_t i=0;i<cloud->points.size();i+=skip_step){
+// 		#<{(|search neighbor points|)}>#
+// 		std::vector<int> indices;
+// 		double laser_distance = sqrt(cloud->points[i].x*cloud->points[i].x + cloud->points[i].y*cloud->points[i].y + cloud->points[i].z*cloud->points[i].z);
+// 		const double search_radius_min = 0.3;
+// 		const double ratio = 0.09;
+// 		double search_radius = ratio*laser_distance;
+// 		if(search_radius<search_radius_min)	search_radius = search_radius_min;
+// 		indices = KdtreeSearch(cloud->points[i], search_radius);
+// 		#<{(|judge|)}>#
+// 		const size_t threshold_num_neighborpoints = 5;
+// 		if(indices.size()<threshold_num_neighborpoints){
+// 			// std::cout << ">> indices.size() = " << indices.size() << " < " << threshold_num_neighborpoints << ", then skip" << std::endl;
+// 			continue;
+// 		}
+// 		#<{(|compute normal|)}>#
+// 		float curvature;
+// 		Eigen::Vector4f plane_parameters;
+// 		pcl::computePointNormal(*cloud, indices, plane_parameters, curvature);
+// 		#<{(|create tmp object|)}>#
+// 		pcl::PointNormal tmp_normal;
+// 		tmp_normal.x = cloud->points[i].x;
+// 		tmp_normal.y = cloud->points[i].y;
+// 		tmp_normal.z = cloud->points[i].z;
+// 		tmp_normal.normal_x = plane_parameters[0];
+// 		tmp_normal.normal_y = plane_parameters[1];
+// 		tmp_normal.normal_z = plane_parameters[2];
+// 		tmp_normal.curvature = curvature;
+// 		flipNormalTowardsViewpoint(tmp_normal, 0.0, 0.0, 0.0, tmp_normal.normal_x, tmp_normal.normal_y, tmp_normal.normal_z);
+// 		normals->points.push_back(tmp_normal);
+// 		#<{(|judge|)}>#
+// 		const double threshold_angle = 30.0;	//[deg]
+// 		if(fabs(fabs(AngleBetweenVectors(tmp_normal, g_vector_from_ekf))-M_PI/2.0)>threshold_angle/180.0*M_PI){
+// 			// std::cout << ">> angle from square angle = " << fabs(AngleBetweenVectors(tmp_normal, g_vector_from_ekf->points[0])-M_PI/2.0) << " > " << threshold_angle << ", then skip" << std::endl;
+// 			continue;
+// 		}
+// 		#<{(|judge|)}>#
+// 		const double threshold_fitting_error = 0.01;	//[m]
+// 		if(ComputeSquareError(plane_parameters, indices)>threshold_fitting_error){
+// 			// std::cout << ">> square error = " << ComputeSquareError(plane_parameters, indices) << " > " << threshold_fitting_error << ", then skip" << std::endl;
+// 			continue;
+// 		}
+// 		#<{(|delete nan|)}>#
+// 		if(std::isnan(plane_parameters[0]) || std::isnan(plane_parameters[1]) || std::isnan(plane_parameters[2])){
+// 			// std::cout << ">> this point has NAN, then skip" << std::endl;
+// 			continue;
+// 		}
+// 		#<{(|input|)}>#
+// 		// std::cout << ">> ok, then input" << std::endl;
+// 		normals_extracted->points.push_back(tmp_normal);
+// 		#<{(|unit gaussian sphere|)}>#
+// 		pcl::PointXYZ tmp_point;
+// 		tmp_point.x = plane_parameters[0];
+// 		tmp_point.y = plane_parameters[1];
+// 		tmp_point.z = plane_parameters[2];
+// 		gaussian_sphere->points.push_back(tmp_point);
+// 		#<{(|d-gaussian sphere|)}>#
+// 		tmp_point.x = -plane_parameters[3]*plane_parameters[0];
+// 		tmp_point.y = -plane_parameters[3]*plane_parameters[1];
+// 		tmp_point.z = -plane_parameters[3]*plane_parameters[2];
+// 		d_gaussian_sphere->points.push_back(tmp_point);
+// 	}
+// }
 void PoseEstimationGaussianSphere::FittingWalls(void)
 {
 	// std::cout << "NORMAL ESTIMATION" << std::endl;
+
 	kdtree.setInputCloud(cloud);
 
 	const size_t skip_step = 3;
 	for(size_t i=0;i<cloud->points.size();i+=skip_step){
+		bool input_to_gauss = true;
+		bool input_to_dgauss = true;
 		/*search neighbor points*/
 		std::vector<int> indices;
 		double laser_distance = sqrt(cloud->points[i].x*cloud->points[i].x + cloud->points[i].y*cloud->points[i].y + cloud->points[i].z*cloud->points[i].z);
@@ -174,11 +247,11 @@ void PoseEstimationGaussianSphere::FittingWalls(void)
 		if(search_radius<search_radius_min)	search_radius = search_radius_min;
 		indices = KdtreeSearch(cloud->points[i], search_radius);
 		/*judge*/
-		const size_t threshold_num_neighborpoints = 20;
-		if(indices.size()<threshold_num_neighborpoints){
-			// std::cout << ">> indices.size() = " << indices.size() << " < " << threshold_num_neighborpoints << ", then skip" << std::endl;
-			continue;
-		}
+		const size_t threshold_num_neighborpoints_gauss = 30;
+		const size_t threshold_num_neighborpoints_dgauss = 5;
+		if(indices.size()<threshold_num_neighborpoints_gauss)	input_to_gauss = false;
+		if(indices.size()<threshold_num_neighborpoints_dgauss)	input_to_dgauss = false;
+		if(!input_to_gauss && !input_to_dgauss)	continue;
 		/*compute normal*/
 		float curvature;
 		Eigen::Vector4f plane_parameters;
@@ -194,37 +267,43 @@ void PoseEstimationGaussianSphere::FittingWalls(void)
 		tmp_normal.curvature = curvature;
 		flipNormalTowardsViewpoint(tmp_normal, 0.0, 0.0, 0.0, tmp_normal.normal_x, tmp_normal.normal_y, tmp_normal.normal_z);
 		normals->points.push_back(tmp_normal);
+		/*delete nan*/
+		if(std::isnan(plane_parameters[0]) || std::isnan(plane_parameters[1]) || std::isnan(plane_parameters[2])){
+			input_to_gauss = false;
+			input_to_dgauss = false;
+			continue;
+		}
 		/*judge*/
 		const double threshold_angle = 30.0;	//[deg]
 		if(fabs(fabs(AngleBetweenVectors(tmp_normal, g_vector_from_ekf))-M_PI/2.0)>threshold_angle/180.0*M_PI){
-			// std::cout << ">> angle from square angle = " << fabs(AngleBetweenVectors(tmp_normal, g_vector_from_ekf->points[0])-M_PI/2.0) << " > " << threshold_angle << ", then skip" << std::endl;
+			input_to_gauss = false;
+			input_to_dgauss = false;
 			continue;
 		}
 		/*judge*/
 		const double threshold_fitting_error = 0.01;	//[m]
 		if(ComputeSquareError(plane_parameters, indices)>threshold_fitting_error){
-			// std::cout << ">> square error = " << ComputeSquareError(plane_parameters, indices) << " > " << threshold_fitting_error << ", then skip" << std::endl;
-			continue;
-		}
-		/*delete nan*/
-		if(std::isnan(plane_parameters[0]) || std::isnan(plane_parameters[1]) || std::isnan(plane_parameters[2])){
-			// std::cout << ">> this point has NAN, then skip" << std::endl;
+			input_to_gauss = false;
+			input_to_dgauss = false;
 			continue;
 		}
 		/*input*/
-		// std::cout << ">> ok, then input" << std::endl;
 		normals_extracted->points.push_back(tmp_normal);
 		/*unit gaussian sphere*/
 		pcl::PointXYZ tmp_point;
-		tmp_point.x = plane_parameters[0];
-		tmp_point.y = plane_parameters[1];
-		tmp_point.z = plane_parameters[2];
-		gaussian_sphere->points.push_back(tmp_point);
+		if(input_to_gauss){
+			tmp_point.x = plane_parameters[0];
+			tmp_point.y = plane_parameters[1];
+			tmp_point.z = plane_parameters[2];
+			gaussian_sphere->points.push_back(tmp_point);
+		}
 		/*d-gaussian sphere*/
-		tmp_point.x = -plane_parameters[3]*plane_parameters[0];
-		tmp_point.y = -plane_parameters[3]*plane_parameters[1];
-		tmp_point.z = -plane_parameters[3]*plane_parameters[2];
-		d_gaussian_sphere->points.push_back(tmp_point);
+		if(input_to_dgauss){
+			tmp_point.x = -plane_parameters[3]*plane_parameters[0];
+			tmp_point.y = -plane_parameters[3]*plane_parameters[1];
+			tmp_point.z = -plane_parameters[3]*plane_parameters[2];
+			d_gaussian_sphere->points.push_back(tmp_point);
+		}
 	}
 }
 
@@ -468,97 +547,6 @@ pcl::PointXYZ PoseEstimationGaussianSphere::PointTransformation(pcl::PointXYZ p,
 
 	return p_;
 }
-
-// bool PoseEstimationGaussianSphere::MatchWalls(void)
-// {
-// 	// std::cout << "MATCH WALLS" << std::endl;
-//
-// 	bool succeeded_y = false;
-// 	double local_pose_error_rpy_sincosatan[3][3] = {};
-// 	tf::Quaternion q_ave_local_pose_error;
-// 	bool compute_local_pose_error_in_quaternion = false;
-//
-// 	std::cout << "list_walls.size() = " << list_walls.size() << " -------------------"<< std::endl;
-// 	if(list_walls.empty()){
-// 		for(size_t i=0;i<d_gaussian_sphere_clustered->points.size();i++) InputNewWallInfo(d_gaussian_sphere_clustered->points[i]);
-// 		return succeeded_y;
-// 	}
-// 	else{
-// 		const double ratio_matching_distance = 0.08;
-// 		const int threshold_count_match = 5;
-// 		const int k = 1;
-// 		kdtree.setInputCloud(d_gaussian_sphere_registered);
-// 		for(size_t i=0;i<d_gaussian_sphere_clustered->points.size();i++){
-// 			std::vector<int> pointIdxNKNSearch(k);
-// 			std::vector<float> pointNKNSquaredDistance(k);
-// 			if(kdtree.nearestKSearch(d_gaussian_sphere_clustered->points[i], k, pointIdxNKNSearch, pointNKNSquaredDistance)<=0)	std::cout << "kdtree error" << std::endl;
-// 			double point_depth = sqrt(d_gaussian_sphere_clustered->points[i].x*d_gaussian_sphere_clustered->points[i].x + d_gaussian_sphere_clustered->points[i].y*d_gaussian_sphere_clustered->points[i].y + d_gaussian_sphere_clustered->points[i].z*d_gaussian_sphere_clustered->points[i].z);
-// 			double threshold_matching_distance = ratio_matching_distance*point_depth;
-// 			if(sqrt(pointNKNSquaredDistance[0])<threshold_matching_distance && !list_walls[pointIdxNKNSearch[0]].found_match){
-// 				list_walls[pointIdxNKNSearch[0]].found_match = true;
-// 				list_walls[pointIdxNKNSearch[0]].count_match++;
-// 				list_walls[pointIdxNKNSearch[0]].count_nomatch = 0;
-// 				if(list_walls[pointIdxNKNSearch[0]].fixed){
-// 					tf::Quaternion tmp_q_local_pose_error = GetRelativeRotation(d_gaussian_sphere_clustered->points[i], d_gaussian_sphere_registered->points[pointIdxNKNSearch[0]]);
-// 					if(compute_local_pose_error_in_quaternion){
-// 						tmp_q_local_pose_error = tf::Quaternion(list_walls[pointIdxNKNSearch[0]].count_match*tmp_q_local_pose_error.x(), list_walls[pointIdxNKNSearch[0]].count_match*tmp_q_local_pose_error.y(), list_walls[pointIdxNKNSearch[0]].count_match*tmp_q_local_pose_error.z(), list_walls[pointIdxNKNSearch[0]].count_match*tmp_q_local_pose_error.w());
-// 						if(!succeeded_y)	q_ave_local_pose_error = tmp_q_local_pose_error;
-// 						else	q_ave_local_pose_error += tmp_q_local_pose_error;
-// 					}
-// 					else{
-// 						double tmp_local_pose_error_rpy[3];
-// 						tf::Matrix3x3(tmp_q_local_pose_error).getRPY(tmp_local_pose_error_rpy[0], tmp_local_pose_error_rpy[1], tmp_local_pose_error_rpy[2]);
-// 						for(int j=0;j<3;j++){
-// 							// local_pose_error_rpy_sincosatan[j][0] += sin(tmp_local_pose_error_rpy[j]);
-// 							// local_pose_error_rpy_sincosatan[j][1] += cos(tmp_local_pose_error_rpy[j]);
-// 							local_pose_error_rpy_sincosatan[j][0] += list_walls[pointIdxNKNSearch[0]].count_match*sin(tmp_local_pose_error_rpy[j]);
-// 							local_pose_error_rpy_sincosatan[j][1] += list_walls[pointIdxNKNSearch[0]].count_match*cos(tmp_local_pose_error_rpy[j]);
-// 							// double distance = sqrt(d_gaussian_sphere_clustered->points[i].x*d_gaussian_sphere_clustered->points[i].x + d_gaussian_sphere_clustered->points[i].y*d_gaussian_sphere_clustered->points[i].y + d_gaussian_sphere_clustered->points[i].z*d_gaussian_sphere_clustered->points[i].z);
-// 							// local_pose_error_rpy_sincosatan[j][0] += distance*sin(tmp_local_pose_error_rpy[j]);
-// 							// local_pose_error_rpy_sincosatan[j][1] += distance*cos(tmp_local_pose_error_rpy[j]);
-// 						}
-// 					}
-// 					succeeded_y = true;
-// 					std::cout << "list_walls[" << pointIdxNKNSearch[0] << "].count_match = " << list_walls[pointIdxNKNSearch[0]].count_match << std::endl;
-// 				}
-// 				else{
-// 					list_walls[pointIdxNKNSearch[0]].point = d_gaussian_sphere_clustered->points[i];
-// 					KalmanFilterForRegistration(list_walls[pointIdxNKNSearch[0]]);
-// 					if(list_walls[pointIdxNKNSearch[0]].count_match>threshold_count_match)	list_walls[pointIdxNKNSearch[0]].fixed = true;
-// 				}
-// 			}
-// 			else	InputNewWallInfo(d_gaussian_sphere_clustered->points[i]);
-// 		}
-// 		#<{(|arrange list|)}>#
-// 		const int threshold_count_nomatch = 5;
-// 		for(size_t i=0;i<list_walls.size();i++){
-// 			if(!list_walls[i].found_match)	list_walls[i].count_nomatch++;
-// 			if(list_walls[i].count_nomatch>threshold_count_nomatch){
-// 				list_walls.erase(list_walls.begin() + i);
-// 				i--;
-// 			}
-// 			else	list_walls[i].found_match = false;
-// 		}
-// 		#<{(|estimate pose|)}>#
-// 		if(succeeded_y){
-// 			if(!compute_local_pose_error_in_quaternion){
-// 				for(int j=0;j<3;j++)	local_pose_error_rpy_sincosatan[j][2] = atan2(local_pose_error_rpy_sincosatan[j][0], local_pose_error_rpy_sincosatan[j][1]);
-// 				q_ave_local_pose_error = tf::createQuaternionFromRPY(local_pose_error_rpy_sincosatan[0][2], local_pose_error_rpy_sincosatan[1][2], local_pose_error_rpy_sincosatan[2][2]);
-// 			}
-// 			q_ave_local_pose_error.normalize();
-// 			tf::Quaternion q_pose_odom_now;
-// 			quaternionMsgToTF(odom_now.pose.pose.orientation, q_pose_odom_now);
-// 			quaternionTFToMsg(q_pose_odom_now*q_ave_local_pose_error, pose_pub.pose.orientation);
-// 			std::cout << "succeeded matching" << std::endl;
-//
-// 			double tmp_rpy[3];
-// 			tf::Matrix3x3(q_pose_odom_now*q_ave_local_pose_error).getRPY(tmp_rpy[0], tmp_rpy[1], tmp_rpy[2]);
-// 			rpy_pub.data[2] = tmp_rpy[2];
-// 			std::cout << "q_ave_local_pose_error: " << tmp_rpy[0] << ", " << tmp_rpy[1] << ", " << tmp_rpy[2] << std::endl;
-// 		}
-// 		return succeeded_y;
-// 	}
-// }
 
 bool PoseEstimationGaussianSphere::MatchWalls(void)
 {

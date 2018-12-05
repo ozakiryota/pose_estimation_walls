@@ -16,7 +16,7 @@ class ImuInitialAlignment{
 		ros::Publisher pub_bias;
 		tf::TransformBroadcaster tf_broadcaster;
 		/*const*/
-		const int num_state = 2;
+		const int num_state = 3;
 		const double timelimit = 120.0;	//[s]
 		/*objects*/
 		geometry_msgs::Quaternion initial_pose;
@@ -65,7 +65,7 @@ void ImuInitialAlignment::Callback(const sensor_msgs::ImuConstPtr& msg)
 		
 		if(imu_is_moving || time>timelimit){
 			initial_algnment_is_done = true;
-			tf::Quaternion q = tf::createQuaternionFromRPY(X(0, 0), X(1, 0), 0.0);
+			tf::Quaternion q = tf::createQuaternionFromRPY(X(0, 0), X(1, 0), X(2, 0));
 			quaternionTFToMsg(q, initial_pose);
 			if(time>timelimit)	std::cout << "time > " << timelimit << "[s]" << std::endl;
 			else	std::cout << "Moved at " << time << "[s]" << std::endl;
@@ -148,23 +148,27 @@ void ImuInitialAlignment::Prediction(void)
 }
 void ImuInitialAlignment::Observation(void)
 {
-	const int num_obs = 2;
+	const int num_obs = 3;	
 
 	double ax = average.linear_acceleration.x;
 	double ay = average.linear_acceleration.y;
 	double az = average.linear_acceleration.z;
 	double roll = X(0, 0);
 	double pitch = X(1, 0);
+	double yaw = X(2, 0);
 	
 	Eigen::MatrixXd Z(num_obs, 1);
 	Z <<	atan2(ay, az),
-			atan2(-ax, sqrt(ay*ay + az*az));
+			atan2(-ax, sqrt(ay*ay + az*az)),
+			yaw;
 	Eigen::MatrixXd H(num_obs, num_state);
-	H <<	1,	0,
-	  		0,	1;
+	H <<	1,	0,	0,
+	  		0,	1,	0,
+			0,	0,	1;
 	Eigen::MatrixXd jH(num_obs, num_state);
-	jH <<	1,	0,
-			0,	1;
+	jH <<	1,	0,	0,
+	  		0,	1,	0,
+			0,	0,	1;
 	const double sigma = 1.0e-1;
 	Eigen::MatrixXd R = sigma*Eigen::MatrixXd::Identity(num_obs, num_obs);
 	Eigen::MatrixXd Y(num_obs, 1);
