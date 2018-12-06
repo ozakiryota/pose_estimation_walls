@@ -144,11 +144,11 @@ void EKFPose::PredictionIMU(sensor_msgs::Imu imu, double dt)
 		for(int j=0;j<num_state;j++)    jF(i, j) = dfdx[i][j];
 	}
 	const double sigma = 1.0e-1;
-	// Eigen::MatrixXd Q = sigma*Eigen::MatrixXd::Identity(num_state, num_state);
-	Eigen::MatrixXd Q(num_state, num_state);
-	Q <<	1.0e-1,	0, 0,
-	 		0,	1.0e-1,	0,
-			0,	0,	5.0e+5;
+	Eigen::MatrixXd Q = sigma*Eigen::MatrixXd::Identity(num_state, num_state);
+	// Eigen::MatrixXd Q(num_state, num_state);
+	// Q <<	1.0e-1,	0, 0,
+	//  		0,	1.0e-1,	0,
+	// 		0,	0,	5.0e+5;
 	
 	// X = F;
 	// for(int i=0;i<3;i++){
@@ -316,8 +316,13 @@ void EKFPose::CallbackRPYWalls(const std_msgs::Float64MultiArrayConstPtr& msg)
 		}
 		Eigen::MatrixXd H = Eigen::MatrixXd::Identity(num_obs, num_state);
 		Eigen::MatrixXd jH = H;
-		const double sigma = 1.0e+1;
+		// const double sigma = 1.0e+1;
+		const double sigma = 1.0e-1;
 		Eigen::MatrixXd R = sigma*Eigen::MatrixXd::Identity(num_obs, num_obs);
+		// Eigen::MatrixXd R(num_obs, num_obs);
+		// R <<	1.0e+2,	0.0,	0.0,
+		//   		0.0,	1.0e+2,	0.0,
+		// 		0.0,	0.0,	1.0e+1;
 		Eigen::MatrixXd Y(num_obs, 1);
 		Eigen::MatrixXd S(num_obs, num_obs);
 		Eigen::MatrixXd K(num_state, num_obs);

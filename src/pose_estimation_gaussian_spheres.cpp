@@ -247,7 +247,7 @@ void PoseEstimationGaussianSphere::FittingWalls(void)
 		if(search_radius<search_radius_min)	search_radius = search_radius_min;
 		indices = KdtreeSearch(cloud->points[i], search_radius);
 		/*judge*/
-		const size_t threshold_num_neighborpoints_gauss = 30;
+		const size_t threshold_num_neighborpoints_gauss = 10;
 		const size_t threshold_num_neighborpoints_dgauss = 5;
 		if(indices.size()<threshold_num_neighborpoints_gauss)	input_to_gauss = false;
 		if(indices.size()<threshold_num_neighborpoints_dgauss)	input_to_dgauss = false;
@@ -344,7 +344,7 @@ void PoseEstimationGaussianSphere::ClusterGauss(void)
 {
 	// std::cout << "POINT CLUSTER" << std::endl;
 	const double cluster_distance = 0.1;
-	const int min_num_cluster_belongings = 60;
+	const int min_num_cluster_belongings = 70;
 	pcl::search::KdTree<pcl::PointXYZ>::Ptr tree (new pcl::search::KdTree<pcl::PointXYZ>);
 	tree->setInputCloud(gaussian_sphere);
 	std::vector<pcl::PointIndices> cluster_indices;
@@ -435,6 +435,8 @@ bool PoseEstimationGaussianSphere::GVectorEstimation(void)
 	/*convertion to roll, pitch*/
 	rpy_pub.data[0] = atan2(-g_vector_walls.normal_y, -g_vector_walls.normal_z);
 	rpy_pub.data[1] = atan2(g_vector_walls.normal_x, sqrt(-g_vector_walls.normal_y*-g_vector_walls.normal_y + -g_vector_walls.normal_z*-g_vector_walls.normal_z));
+	// rpy_pub.data[0] = atan2(-g_vector_walls.normal_y, -g_vector_walls.normal_z);
+	// rpy_pub.data[1] = atan2(g_vector_walls.normal_x, -g_vector_walls.normal_y*sin(rpy_pub.data[0]) + -g_vector_walls.normal_z*cos(rpy_pub.data[0]));
 	return true;
 }
 

@@ -23,9 +23,9 @@
 	<node pkg="pose_estimation_walls" name="combine_linearvelocity_and_pose" type="combine_linearvelocity_and_pose"/>
 
 	<!-- comparisons	 -->
+	<node pkg="pose_estimation_walls" name="gyrodometry" type="gyrodometry"/>
 	<include file="$(find loam_velodyne)/launch/hector_loam_velodyne.launch"/>
 	<node pkg="pose_estimation_walls" name="odom_creater_for_loamvelodyne" type="odom_creater_for_loamvelodyne"/>
-	<node pkg="pose_estimation_walls" name="gyrodometry" type="gyrodometry"/>
 	<!-- <node pkg="pose_estimation_walls" name="odom_creater_for_lsdslam" type="odom_creater_for_lsdslam"/> -->
 
 	<!-- graph -->
