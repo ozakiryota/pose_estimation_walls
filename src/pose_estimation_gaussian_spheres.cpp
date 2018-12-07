@@ -247,7 +247,7 @@ void PoseEstimationGaussianSphere::FittingWalls(void)
 		if(search_radius<search_radius_min)	search_radius = search_radius_min;
 		indices = KdtreeSearch(cloud->points[i], search_radius);
 		/*judge*/
-		const size_t threshold_num_neighborpoints_gauss = 10;
+		const size_t threshold_num_neighborpoints_gauss = 20;
 		const size_t threshold_num_neighborpoints_dgauss = 5;
 		if(indices.size()<threshold_num_neighborpoints_gauss)	input_to_gauss = false;
 		if(indices.size()<threshold_num_neighborpoints_dgauss)	input_to_dgauss = false;
