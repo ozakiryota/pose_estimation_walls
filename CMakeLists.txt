@@ -230,3 +230,5 @@ add_executable(pose_estimation_gaussian_spheres src/pose_estimation_gaussian_sph
 target_link_libraries(pose_estimation_gaussian_spheres ${catkin_LIBRARIES})
 add_executable(ekf_pose_old_ver src/ekf_pose_old_ver.cpp)
 target_link_libraries(ekf_pose_old_ver ${catkin_LIBRARIES})
+add_executable(odom_republish_infant src/odom_republish_infant.cpp)
+target_link_libraries(odom_republish_infant ${catkin_LIBRARIES})

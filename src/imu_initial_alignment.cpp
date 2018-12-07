@@ -51,17 +51,20 @@ void ImuInitialAlignment::Callback(const sensor_msgs::ImuConstPtr& msg)
 {
 	if(!initial_algnment_is_done){
 		double time;
-		try{
-			time = (ros::Time::now() - time_started).toSec();
-		}
-		catch(std::runtime_error& ex) {
-			ROS_ERROR("Exception: [%s]", ex.what());
-		}
 		if(record.size()==0){
 			time = 0.0;
 			time_started = ros::Time::now();
 		}
-		else	imu_is_moving = JudgeMoving();
+		else{
+			try{
+				time = (ros::Time::now() - time_started).toSec();
+			}
+			catch(std::runtime_error& ex) {
+				ROS_ERROR("Exception: [%s]", ex.what());
+			}
+
+			imu_is_moving = JudgeMoving();
+		}
 		
 		if(imu_is_moving || time>timelimit){
 			initial_algnment_is_done = true;
@@ -103,30 +106,32 @@ void ImuInitialAlignment::ComputeAverage(void)
 
 bool ImuInitialAlignment::JudgeMoving(void)
 {
-	const float threshold_w = 0.03;
-	const float threshold_a = 0.20;
+	// const float threshold_w = 0.03;
+	// const float threshold_a = 0.20;
+	const float threshold_w = 0.05;
+	const float threshold_a = 0.5;
 	if(fabs(record[record.size()-1].angular_velocity.x - average.angular_velocity.x)>threshold_w){
-		std::cout << "Moved-wx" << std::endl;
+		std::cout << "Moved-wx: " << record[record.size()-1].angular_velocity.x - average.angular_velocity.x << std::endl;
 		return true;
 	}
 	if(fabs(record[record.size()-1].angular_velocity.y - average.angular_velocity.y)>threshold_w){
-		std::cout << "Moved-wy" << std::endl;
+		std::cout << "Moved-wy: " << record[record.size()-1].angular_velocity.y - average.angular_velocity.y << std::endl;
 		return true;
 	}
 	if(fabs(record[record.size()-1].angular_velocity.z - average.angular_velocity.z)>threshold_w){
-		std::cout << "Moved-wz" << std::endl;
+		std::cout << "Moved-wz: " << record[record.size()-1].angular_velocity.z - average.angular_velocity.z << std::endl;
 		return true;
 	}
 	if(fabs(record[record.size()-1].linear_acceleration.x - average.linear_acceleration.x)>threshold_a){
-		std::cout << "Moved-ax" << std::endl;
+		std::cout << "Moved-ax: " << record[record.size()-1].linear_acceleration.x - average.linear_acceleration.x << std::endl;
 		return true;
 	}
 	if(fabs(record[record.size()-1].linear_acceleration.y - average.linear_acceleration.y)>threshold_a){
-		std::cout << "Moved-ay" << std::endl;
+		std::cout << "Moved-ay: " << record[record.size()-1].linear_acceleration.y - average.linear_acceleration.y << std::endl;
 		return true;
 	}
 	if(fabs(record[record.size()-1].linear_acceleration.z - average.linear_acceleration.z)>threshold_a){
-		std::cout << "Moved-az" << std::endl;
+		std::cout << "Moved-az: " << record[record.size()-1].linear_acceleration.z - average.linear_acceleration.z << std::endl;
 		return true;
 	}
 	return false;

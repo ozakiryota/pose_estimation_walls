@@ -720,6 +720,7 @@ tf::Quaternion PoseEstimationGaussianSphere::GetRelativeRotation(pcl::PointXYZ o
 	tf::Matrix3x3(relative_rotation).getRPY(rpy[0], rpy[1], rpy[2]);
 	std::cout << "local error: " << rpy[0] << ", " << rpy[1] << ", " << rpy[2] << std::endl;
 	std::cout << "distance: " << (Target - Origin).norm() << std::endl;
+	std::cout << "angle: " << acos(Origin.dot(Target)/Origin.norm()/Target.norm())/M_PI*180.0 << std::endl;
 	std::cout << "Origin: (" << Origin(0) << ", " << Origin(1) << ", " << Origin(2) << "), depth = " << Origin.norm() << std::endl;
 	std::cout << "Target: (" << Target(0) << ", " << Target(1) << ", " << Target(2) << "), depth = " << Target.norm() << std::endl;
 
