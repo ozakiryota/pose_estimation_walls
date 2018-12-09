@@ -51,7 +51,7 @@ void ImuInitialAlignment::Callback(const sensor_msgs::ImuConstPtr& msg)
 {
 	if(!initial_algnment_is_done){
 		double time;
-		if(record.size()==0){
+		if(record.size()<10){
 			time = 0.0;
 			time_started = ros::Time::now();
 		}

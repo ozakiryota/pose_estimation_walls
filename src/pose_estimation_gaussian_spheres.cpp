@@ -21,6 +21,7 @@ class PoseEstimationGaussianSphere{
 		/*subscribe*/
 		ros::Subscriber sub_pc;
 		ros::Subscriber sub_odom;
+		ros::Subscriber sub_inipose;
 		/*publish*/
 		ros::Publisher pub_pose;
 		ros::Publisher pub_rpy;
@@ -57,14 +58,18 @@ class PoseEstimationGaussianSphere{
 		nav_msgs::Odometry odom_now;
 		geometry_msgs::PoseStamped pose_pub;
 		std_msgs::Float64MultiArray rpy_pub;
+		double rp_sincos_calibration[2][2] = {};
+		Eigen::Quaternionf lidar_alignment{1.0, 0.0, 0.0, 0.0};
 		ros::Time time_pub;
 		/*flags*/
 		bool first_callback_odom = true;
+		bool inipose_is_available = false;
 	public:
 		PoseEstimationGaussianSphere();
 		void CallbackPC(const sensor_msgs::PointCloud2ConstPtr &msg);
 		void CallbackOdom(const nav_msgs::OdometryConstPtr& msg);
 		void ConvertionPoseToGVector(void);
+		void CallbackInipose(const geometry_msgs::QuaternionConstPtr& msg);
 		void ClearPoints(void);
 		void FittingWalls(void);
 		std::vector<int> KdtreeSearch(pcl::PointXYZ searchpoint, double search_radius);
@@ -88,6 +93,7 @@ PoseEstimationGaussianSphere::PoseEstimationGaussianSphere()
 {
 	sub_pc = nh.subscribe("/velodyne_points", 1, &PoseEstimationGaussianSphere::CallbackPC, this);
 	sub_odom = nh.subscribe("/combined_odometry", 1, &PoseEstimationGaussianSphere::CallbackOdom, this);
+	sub_inipose = nh.subscribe("/initial_pose", 1, &PoseEstimationGaussianSphere::CallbackInipose, this);
 	pub_rpy = nh.advertise<std_msgs::Float64MultiArray>("/rpy_walls", 1);
 	pub_pose = nh.advertise<geometry_msgs::PoseStamped>("/pose_dgauss", 1);
 	viewer.setBackgroundColor(1, 1, 1);
@@ -104,6 +110,7 @@ void PoseEstimationGaussianSphere::CallbackPC(const sensor_msgs::PointCloud2Cons
 	// std::cout << "CALLBACK PC" << std::endl;
 	pcl::fromROSMsg(*msg, *cloud);
 	time_pub = msg->header.stamp;
+	if(inipose_is_available)	pcl::transformPointCloud(*cloud, *cloud, Eigen::Vector3f(0.0, 0.0, 0.0), lidar_alignment);
 	ClearPoints();
 	FittingWalls();
 	ClusterGauss();
@@ -115,6 +122,12 @@ void PoseEstimationGaussianSphere::CallbackPC(const sensor_msgs::PointCloud2Cons
 		if(!succeeded_rp){
 			rpy_pub.data[0] = NAN;
 			rpy_pub.data[1] = NAN;
+		}
+		else if(!inipose_is_available){
+			rp_sincos_calibration[0][0] += sin(rpy_pub.data[0]);
+			rp_sincos_calibration[0][1] += cos(rpy_pub.data[0]);
+			rp_sincos_calibration[1][0] += sin(rpy_pub.data[1]);
+			rp_sincos_calibration[1][1] += cos(rpy_pub.data[1]);
 		}
 		if(!succeeded_y)	rpy_pub.data[2] = NAN;
 		if(succeeded_rp || succeeded_y)	Publication();
@@ -140,6 +153,21 @@ void PoseEstimationGaussianSphere::ConvertionPoseToGVector(void)
 	g_vector_from_ekf.normal_x = q_g_vector_local.x();
 	g_vector_from_ekf.normal_y = q_g_vector_local.y();
 	g_vector_from_ekf.normal_z = q_g_vector_local.z();
+}
+
+void PoseEstimationGaussianSphere::CallbackInipose(const geometry_msgs::QuaternionConstPtr& msg)
+{
+	if(!inipose_is_available){
+		inipose_is_available = true;
+		tf::Quaternion q_inipose;
+		quaternionMsgToTF(*msg, q_inipose);
+		double r_calibration = atan2(rp_sincos_calibration[0][0], rp_sincos_calibration[0][1]);
+		double p_calibration = atan2(rp_sincos_calibration[1][0], rp_sincos_calibration[1][1]);
+		std::cout << "r_calibration = " << r_calibration << std::endl;
+		std::cout << "p_calibration = " << p_calibration << std::endl;
+		tf::Quaternion q_calibration = tf::createQuaternionFromRPY(r_calibration, p_calibration, 0.0)*q_inipose.inverse();
+		lidar_alignment = Eigen::Quaternionf(q_calibration.w(), q_calibration.x(), q_calibration.y(), q_calibration.z());
+	}
 }
 
 void PoseEstimationGaussianSphere::ClearPoints(void)
@@ -247,8 +275,10 @@ void PoseEstimationGaussianSphere::FittingWalls(void)
 		if(search_radius<search_radius_min)	search_radius = search_radius_min;
 		indices = KdtreeSearch(cloud->points[i], search_radius);
 		/*judge*/
+		// const size_t threshold_num_neighborpoints_gauss = 20;
+		// const size_t threshold_num_neighborpoints_dgauss = 5;
 		const size_t threshold_num_neighborpoints_gauss = 20;
-		const size_t threshold_num_neighborpoints_dgauss = 5;
+		const size_t threshold_num_neighborpoints_dgauss = 30;
 		if(indices.size()<threshold_num_neighborpoints_gauss)	input_to_gauss = false;
 		if(indices.size()<threshold_num_neighborpoints_dgauss)	input_to_dgauss = false;
 		if(!input_to_gauss && !input_to_dgauss)	continue;
@@ -567,8 +597,10 @@ bool PoseEstimationGaussianSphere::MatchWalls(void)
 	else{
 		// const double ratio_matching_norm_dif = 0.1;
 		// const double min_matching_norm_dif = 0.5;	//[m]
+		// const double threshold_matching_norm_dif = 1.0;	//[m]
+		// const double threshold_matching_angle = 15.0;	//[deg]
 		const double threshold_matching_norm_dif = 1.0;	//[m]
-		const double threshold_matching_angle = 15.0;	//[deg]
+		const double threshold_matching_angle = 5.0;	//[deg]
 		const int threshold_count_match = 5;
 		const int k = 1;
 		kdtree.setInputCloud(d_gaussian_sphere_registered);
