@@ -53,6 +53,7 @@ class PoseEstimationGaussianSphere{
 		pcl::PointCloud<pcl::PointNormal>::Ptr d_gaussian_sphere_clustered_n {new pcl::PointCloud<pcl::PointNormal>};
 		pcl::PointCloud<pcl::PointXYZ>::Ptr d_gaussian_sphere_registered {new pcl::PointCloud<pcl::PointXYZ>};
 		pcl::PointCloud<pcl::PointNormal>::Ptr d_gaussian_sphere_registered_n {new pcl::PointCloud<pcl::PointNormal>};
+		pcl::PointCloud<pcl::PointNormal>::Ptr d_gaussian_sphere_newregistered_n {new pcl::PointCloud<pcl::PointNormal>};
 		/*objects*/
 		std::vector<WallInfo> list_walls;
 		nav_msgs::Odometry odom_now;
@@ -98,6 +99,7 @@ PoseEstimationGaussianSphere::PoseEstimationGaussianSphere()
 	pub_pose = nh.advertise<geometry_msgs::PoseStamped>("/pose_dgauss", 1);
 	viewer.setBackgroundColor(1, 1, 1);
 	viewer.addCoordinateSystem(0.5, "axis");
+	viewer.setCameraPosition(0.0, 0.0, 50.0, 0.0, 0.0, 0.0);
 	g_vector_from_ekf.x = 0.0;
 	g_vector_from_ekf.y = 0.0;
 	g_vector_from_ekf.z = 0.0;
@@ -184,78 +186,9 @@ void PoseEstimationGaussianSphere::ClearPoints(void)
 	d_gaussian_sphere_clustered_n->points.clear();
 	d_gaussian_sphere_registered->points.clear();
 	d_gaussian_sphere_registered_n->points.clear();
+	d_gaussian_sphere_newregistered_n->points.clear();
 }
 
-// void PoseEstimationGaussianSphere::FittingWalls(void)
-// {
-// 	// std::cout << "NORMAL ESTIMATION" << std::endl;
-//
-// 	kdtree.setInputCloud(cloud);
-//
-// 	const size_t skip_step = 3;
-// 	for(size_t i=0;i<cloud->points.size();i+=skip_step){
-// 		#<{(|search neighbor points|)}>#
-// 		std::vector<int> indices;
-// 		double laser_distance = sqrt(cloud->points[i].x*cloud->points[i].x + cloud->points[i].y*cloud->points[i].y + cloud->points[i].z*cloud->points[i].z);
-// 		const double search_radius_min = 0.3;
-// 		const double ratio = 0.09;
-// 		double search_radius = ratio*laser_distance;
-// 		if(search_radius<search_radius_min)	search_radius = search_radius_min;
-// 		indices = KdtreeSearch(cloud->points[i], search_radius);
-// 		#<{(|judge|)}>#
-// 		const size_t threshold_num_neighborpoints = 5;
-// 		if(indices.size()<threshold_num_neighborpoints){
-// 			// std::cout << ">> indices.size() = " << indices.size() << " < " << threshold_num_neighborpoints << ", then skip" << std::endl;
-// 			continue;
-// 		}
-// 		#<{(|compute normal|)}>#
-// 		float curvature;
-// 		Eigen::Vector4f plane_parameters;
-// 		pcl::computePointNormal(*cloud, indices, plane_parameters, curvature);
-// 		#<{(|create tmp object|)}>#
-// 		pcl::PointNormal tmp_normal;
-// 		tmp_normal.x = cloud->points[i].x;
-// 		tmp_normal.y = cloud->points[i].y;
-// 		tmp_normal.z = cloud->points[i].z;
-// 		tmp_normal.normal_x = plane_parameters[0];
-// 		tmp_normal.normal_y = plane_parameters[1];
-// 		tmp_normal.normal_z = plane_parameters[2];
-// 		tmp_normal.curvature = curvature;
-// 		flipNormalTowardsViewpoint(tmp_normal, 0.0, 0.0, 0.0, tmp_normal.normal_x, tmp_normal.normal_y, tmp_normal.normal_z);
-// 		normals->points.push_back(tmp_normal);
-// 		#<{(|judge|)}>#
-// 		const double threshold_angle = 30.0;	//[deg]
-// 		if(fabs(fabs(AngleBetweenVectors(tmp_normal, g_vector_from_ekf))-M_PI/2.0)>threshold_angle/180.0*M_PI){
-// 			// std::cout << ">> angle from square angle = " << fabs(AngleBetweenVectors(tmp_normal, g_vector_from_ekf->points[0])-M_PI/2.0) << " > " << threshold_angle << ", then skip" << std::endl;
-// 			continue;
-// 		}
-// 		#<{(|judge|)}>#
-// 		const double threshold_fitting_error = 0.01;	//[m]
-// 		if(ComputeSquareError(plane_parameters, indices)>threshold_fitting_error){
-// 			// std::cout << ">> square error = " << ComputeSquareError(plane_parameters, indices) << " > " << threshold_fitting_error << ", then skip" << std::endl;
-// 			continue;
-// 		}
-// 		#<{(|delete nan|)}>#
-// 		if(std::isnan(plane_parameters[0]) || std::isnan(plane_parameters[1]) || std::isnan(plane_parameters[2])){
-// 			// std::cout << ">> this point has NAN, then skip" << std::endl;
-// 			continue;
-// 		}
-// 		#<{(|input|)}>#
-// 		// std::cout << ">> ok, then input" << std::endl;
-// 		normals_extracted->points.push_back(tmp_normal);
-// 		#<{(|unit gaussian sphere|)}>#
-// 		pcl::PointXYZ tmp_point;
-// 		tmp_point.x = plane_parameters[0];
-// 		tmp_point.y = plane_parameters[1];
-// 		tmp_point.z = plane_parameters[2];
-// 		gaussian_sphere->points.push_back(tmp_point);
-// 		#<{(|d-gaussian sphere|)}>#
-// 		tmp_point.x = -plane_parameters[3]*plane_parameters[0];
-// 		tmp_point.y = -plane_parameters[3]*plane_parameters[1];
-// 		tmp_point.z = -plane_parameters[3]*plane_parameters[2];
-// 		d_gaussian_sphere->points.push_back(tmp_point);
-// 	}
-// }
 void PoseEstimationGaussianSphere::FittingWalls(void)
 {
 	// std::cout << "NORMAL ESTIMATION" << std::endl;
@@ -278,7 +211,7 @@ void PoseEstimationGaussianSphere::FittingWalls(void)
 		// const size_t threshold_num_neighborpoints_gauss = 20;
 		// const size_t threshold_num_neighborpoints_dgauss = 5;
 		const size_t threshold_num_neighborpoints_gauss = 20;
-		const size_t threshold_num_neighborpoints_dgauss = 30;
+		const size_t threshold_num_neighborpoints_dgauss = 5;
 		if(indices.size()<threshold_num_neighborpoints_gauss)	input_to_gauss = false;
 		if(indices.size()<threshold_num_neighborpoints_dgauss)	input_to_dgauss = false;
 		if(!input_to_gauss && !input_to_dgauss)	continue;
@@ -486,6 +419,7 @@ void PoseEstimationGaussianSphere::ClusterDGauss(void)
 {
 	// std::cout << "POINT CLUSTER" << std::endl;
 	const double cluster_distance = 0.3;
+	// const int min_num_cluster_belongings = 20;
 	const int min_num_cluster_belongings = 20;
 	pcl::search::KdTree<pcl::PointXYZ>::Ptr tree (new pcl::search::KdTree<pcl::PointXYZ>);
 	tree->setInputCloud(d_gaussian_sphere);
@@ -534,7 +468,7 @@ void PoseEstimationGaussianSphere::CreateRegisteredCentroidCloud(void)
 {
 	for(size_t i=0;i<list_walls.size();i++){
 		d_gaussian_sphere_registered->points.push_back(PointTransformation(list_walls[i].point, list_walls[i].odom, odom_now));
-
+		/*for the visualization*/
 		pcl::PointNormal tmp_normal;
 		tmp_normal.x = 0.0;
 		tmp_normal.y = 0.0;
@@ -595,12 +529,12 @@ bool PoseEstimationGaussianSphere::MatchWalls(void)
 		return succeeded_y;
 	}
 	else{
-		// const double ratio_matching_norm_dif = 0.1;
+		// const double ratio_matching_norm_dif = 0.2;
 		// const double min_matching_norm_dif = 0.5;	//[m]
 		// const double threshold_matching_norm_dif = 1.0;	//[m]
 		// const double threshold_matching_angle = 15.0;	//[deg]
 		const double threshold_matching_norm_dif = 1.0;	//[m]
-		const double threshold_matching_angle = 5.0;	//[deg]
+		const double threshold_matching_angle = 15.0;	//[deg]
 		const int threshold_count_match = 5;
 		const int k = 1;
 		kdtree.setInputCloud(d_gaussian_sphere_registered);
@@ -646,7 +580,18 @@ bool PoseEstimationGaussianSphere::MatchWalls(void)
 					if(list_walls[pointIdxNKNSearch[0]].count_match>threshold_count_match)	list_walls[pointIdxNKNSearch[0]].fixed = true;
 				}
 			}
-			else	InputNewWallInfo(d_gaussian_sphere_clustered->points[i]);
+			else{
+				InputNewWallInfo(d_gaussian_sphere_clustered->points[i]);
+				/*for the visualization*/
+				pcl::PointNormal tmp_normal;
+				tmp_normal.x = 0.0;
+				tmp_normal.y = 0.0;
+				tmp_normal.z = 0.0;
+				tmp_normal.normal_x = d_gaussian_sphere_clustered->points[i].x;
+				tmp_normal.normal_y = d_gaussian_sphere_clustered->points[i].y;
+				tmp_normal.normal_z = d_gaussian_sphere_clustered->points[i].z;
+				d_gaussian_sphere_newregistered_n->points.push_back(tmp_normal);
+			}
 		}
 		/*arrange list*/
 		const int threshold_count_nomatch = 5;
@@ -660,11 +605,11 @@ bool PoseEstimationGaussianSphere::MatchWalls(void)
 		}
 		/*estimate pose*/
 		if(succeeded_y){
-			if(!compute_local_pose_error_in_quaternion){
+			if(compute_local_pose_error_in_quaternion)	q_ave_local_pose_error.normalize();
+			else{
 				for(int j=0;j<3;j++)	local_pose_error_rpy_sincosatan[j][2] = atan2(local_pose_error_rpy_sincosatan[j][0], local_pose_error_rpy_sincosatan[j][1]);
 				q_ave_local_pose_error = tf::createQuaternionFromRPY(local_pose_error_rpy_sincosatan[0][2], local_pose_error_rpy_sincosatan[1][2], local_pose_error_rpy_sincosatan[2][2]);
 			}
-			q_ave_local_pose_error.normalize();
 			tf::Quaternion q_pose_odom_now;
 			quaternionMsgToTF(odom_now.pose.pose.orientation, q_pose_odom_now);
 			quaternionTFToMsg(q_pose_odom_now*q_ave_local_pose_error, pose_pub.pose.orientation);
@@ -769,7 +714,7 @@ void PoseEstimationGaussianSphere::Visualization(void)
 	
 	viewer.addPointCloudNormals<pcl::PointNormal>(normals, 1, 0.5, "normals");
 	viewer.setPointCloudRenderingProperties (pcl::visualization::PCL_VISUALIZER_COLOR, 0.0, 0.0, 1.0, "normals");
-	viewer.setPointCloudRenderingProperties (pcl::visualization::PCL_VISUALIZER_LINE_WIDTH, 3, "normals");
+	viewer.setPointCloudRenderingProperties (pcl::visualization::PCL_VISUALIZER_LINE_WIDTH, 1, "normals");
 	
 	viewer.addPointCloudNormals<pcl::PointNormal>(normals_extracted, 1, 0.5, "normals_extracted");
 	viewer.setPointCloudRenderingProperties (pcl::visualization::PCL_VISUALIZER_COLOR, 0.0, 1.0, 1.0, "normals_extracted");
@@ -792,13 +737,17 @@ void PoseEstimationGaussianSphere::Visualization(void)
 	viewer.setPointCloudRenderingProperties (pcl::visualization::PCL_VISUALIZER_LINE_WIDTH, 1, "d_gaussian_sphere_clustered_n");
 	
 	viewer.addPointCloudNormals<pcl::PointNormal>(d_gaussian_sphere_registered_n, 1, 1.0, "d_gaussian_sphere_registered_n");
-	viewer.setPointCloudRenderingProperties (pcl::visualization::PCL_VISUALIZER_COLOR, 0.0, 0.5, 0.0, "d_gaussian_sphere_registered_n");
+	viewer.setPointCloudRenderingProperties (pcl::visualization::PCL_VISUALIZER_COLOR, 0.0, 0.8, 0.0, "d_gaussian_sphere_registered_n");
 	viewer.setPointCloudRenderingProperties (pcl::visualization::PCL_VISUALIZER_LINE_WIDTH, 1, "d_gaussian_sphere_registered_n");
 
-	pcl::PointCloud<pcl::PointNormal>::Ptr tmp_g_vector_walls {new pcl::PointCloud<pcl::PointNormal>};
+	viewer.addPointCloudNormals<pcl::PointNormal>(d_gaussian_sphere_newregistered_n, 1, 1.0, "d_gaussian_sphere_newregistered_n");
+	viewer.setPointCloudRenderingProperties (pcl::visualization::PCL_VISUALIZER_COLOR, 1.0, 1.0, 0.0, "d_gaussian_sphere_newregistered_n");
+	viewer.setPointCloudRenderingProperties (pcl::visualization::PCL_VISUALIZER_LINE_WIDTH, 5, "d_gaussian_sphere_newregistered_n");
+
+	pcl::PointCloud<pcl::PointNormal>::Ptr tmp_g_vector_walls (new pcl::PointCloud<pcl::PointNormal>);
 	tmp_g_vector_walls->points.push_back(g_vector_walls);
 	viewer.addPointCloudNormals<pcl::PointNormal>(tmp_g_vector_walls, 1, 1.0, "g_vector_walls");
-	viewer.setPointCloudRenderingProperties (pcl::visualization::PCL_VISUALIZER_COLOR, 0.0, 1.0, 0.0, "g_vector_walls");
+	viewer.setPointCloudRenderingProperties (pcl::visualization::PCL_VISUALIZER_COLOR, 0.0, 0.5, 0.0, "g_vector_walls");
 	viewer.setPointCloudRenderingProperties (pcl::visualization::PCL_VISUALIZER_LINE_WIDTH, 3, "g_vector_walls");
 	
 	viewer.spinOnce();

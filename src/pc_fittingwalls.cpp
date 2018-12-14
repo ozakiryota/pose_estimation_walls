@@ -60,6 +60,7 @@ PCFittingWalls::PCFittingWalls()
 	pub = nh.advertise<sensor_msgs::PointCloud2>("/g_and_walls", 1);
 	viewer.setBackgroundColor(1, 1, 1);
 	viewer.addCoordinateSystem(0.5, "axis");
+	viewer.setCameraPosition(-5.0, -10.0, 6.0, 0.0, 0.0, 1.0);
 	g_vector_from_ekf->points.resize(1);
 	g_vector_from_ekf->points[0].x = 0.0;
 	g_vector_from_ekf->points[0].y = 0.0;

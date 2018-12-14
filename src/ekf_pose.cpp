@@ -316,6 +316,7 @@ void EKFPose::CallbackRPYWalls(const std_msgs::Float64MultiArrayConstPtr& msg)
 		}
 		Eigen::MatrixXd H = Eigen::MatrixXd::Identity(num_obs, num_state);
 		Eigen::MatrixXd jH = H;
+		// const double sigma = 1.0e-0;
 		const double sigma = 1.0e-0;
 		Eigen::MatrixXd R = sigma*Eigen::MatrixXd::Identity(num_obs, num_obs);
 		// Eigen::MatrixXd R(num_obs, num_obs);

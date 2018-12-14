@@ -61,6 +61,7 @@ void OdomPrinter::Print(nav_msgs::Odometry odom)
 
 	std::cout << "--- " << odom.child_frame_id << "  ---" << std::endl;
 	std::cout << "position[m]: (" << odom.pose.pose.position.x << ", " << odom.pose.pose.position.y << ", " << odom.pose.pose.position.z << ")" << std::endl;
+	std::cout << "Euc.dist.[m]: " << sqrt(odom.pose.pose.position.x*odom.pose.pose.position.x + odom.pose.pose.position.y*odom.pose.pose.position.y + odom.pose.pose.position.z*odom.pose.pose.position.z) << std::endl;
 	std::cout << "pose[deg]:   (" << est_rpy[0]/M_PI*180.0 << ", " << est_rpy[1]/M_PI*180.0 << ", " << est_rpy[2]/M_PI*180.0 << ")  " << std::endl;
 	std::cout << "error[deg]:  (" << (est_rpy[0] - inipose_rpy[0])/M_PI*180.0 << ", " << (est_rpy[1] - inipose_rpy[1])/M_PI*180.0 << ", " << (est_rpy[2] - inipose_rpy[2])/M_PI*180.0 << ")" << std::endl;
 }
