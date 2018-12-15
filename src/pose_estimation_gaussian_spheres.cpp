@@ -56,6 +56,7 @@ class PoseEstimationGaussianSphere{
 		pcl::PointCloud<pcl::PointNormal>::Ptr d_gaussian_sphere_newregistered_n {new pcl::PointCloud<pcl::PointNormal>};
 		/*objects*/
 		std::vector<WallInfo> list_walls;
+		std::vector<size_t> list_num_dgauss_cluster_belongings;
 		nav_msgs::Odometry odom_now;
 		geometry_msgs::PoseStamped pose_pub;
 		std_msgs::Float64MultiArray rpy_pub;
@@ -187,6 +188,7 @@ void PoseEstimationGaussianSphere::ClearPoints(void)
 	d_gaussian_sphere_registered->points.clear();
 	d_gaussian_sphere_registered_n->points.clear();
 	d_gaussian_sphere_newregistered_n->points.clear();
+	list_num_dgauss_cluster_belongings.clear();
 }
 
 void PoseEstimationGaussianSphere::FittingWalls(void)
@@ -210,7 +212,7 @@ void PoseEstimationGaussianSphere::FittingWalls(void)
 		/*judge*/
 		// const size_t threshold_num_neighborpoints_gauss = 20;
 		// const size_t threshold_num_neighborpoints_dgauss = 5;
-		const size_t threshold_num_neighborpoints_gauss = 20;
+		const size_t threshold_num_neighborpoints_gauss = 5;
 		const size_t threshold_num_neighborpoints_dgauss = 5;
 		if(indices.size()<threshold_num_neighborpoints_gauss)	input_to_gauss = false;
 		if(indices.size()<threshold_num_neighborpoints_dgauss)	input_to_dgauss = false;
@@ -283,7 +285,7 @@ double PoseEstimationGaussianSphere::AngleBetweenVectors(pcl::PointNormal v1, pc
 	double dot_product = v1.normal_x*v2.normal_x + v1.normal_y*v2.normal_y + v1.normal_z*v2.normal_z;
 	double v1_norm = sqrt(v1.normal_x*v1.normal_x + v1.normal_y*v1.normal_y + v1.normal_z*v1.normal_z);
 	double v2_norm = sqrt(v2.normal_x*v2.normal_x + v2.normal_y*v2.normal_y + v2.normal_z*v2.normal_z);
-	double angle = acosf(dot_product/(v1_norm*v2_norm));
+	double angle = acos(dot_product/(v1_norm*v2_norm));
 	return angle;
 }
 
@@ -344,6 +346,7 @@ void PoseEstimationGaussianSphere::ClusterGauss(void)
 		tmp_centroid.y = cluster_indices[i].indices.size()*xyz_centroid[1];
 		tmp_centroid.z = cluster_indices[i].indices.size()*xyz_centroid[2];
 		gaussian_sphere_clustered_weighted->points.push_back(tmp_centroid);
+		/*for the Visualization*/
 		pcl::PointNormal tmp_centroid_n;
 		tmp_centroid_n.x = 0.0;
 		tmp_centroid_n.y = 0.0;
@@ -420,7 +423,7 @@ void PoseEstimationGaussianSphere::ClusterDGauss(void)
 	// std::cout << "POINT CLUSTER" << std::endl;
 	const double cluster_distance = 0.3;
 	// const int min_num_cluster_belongings = 20;
-	const int min_num_cluster_belongings = 20;
+	const int min_num_cluster_belongings = 30;
 	pcl::search::KdTree<pcl::PointXYZ>::Ptr tree (new pcl::search::KdTree<pcl::PointXYZ>);
 	tree->setInputCloud(d_gaussian_sphere);
 	std::vector<pcl::PointIndices> cluster_indices;
@@ -453,6 +456,9 @@ void PoseEstimationGaussianSphere::ClusterDGauss(void)
 		tmp_centroid.y = xyz_centroid[1];
 		tmp_centroid.z = xyz_centroid[2];
 		d_gaussian_sphere_clustered->points.push_back(tmp_centroid);
+		/*record number of belongings*/
+		list_num_dgauss_cluster_belongings.push_back(cluster_indices[i].indices.size());
+		/*for the Visualization*/
 		pcl::PointNormal tmp_centroid_n;
 		tmp_centroid_n.x = 0.0;
 		tmp_centroid_n.y = 0.0;
@@ -534,8 +540,9 @@ bool PoseEstimationGaussianSphere::MatchWalls(void)
 		// const double threshold_matching_norm_dif = 1.0;	//[m]
 		// const double threshold_matching_angle = 15.0;	//[deg]
 		const double threshold_matching_norm_dif = 1.0;	//[m]
-		const double threshold_matching_angle = 15.0;	//[deg]
-		const int threshold_count_match = 5;
+		const double threshold_matching_angle = 8.0;	//[deg]
+		// const int threshold_count_match = 5;
+		const int threshold_count_match = 2;
 		const int k = 1;
 		kdtree.setInputCloud(d_gaussian_sphere_registered);
 		for(size_t i=0;i<d_gaussian_sphere_clustered->points.size();i++){
@@ -547,6 +554,9 @@ bool PoseEstimationGaussianSphere::MatchWalls(void)
 			double angle = acos((d_gaussian_sphere_clustered->points[i].x*d_gaussian_sphere_registered->points[pointIdxNKNSearch[0]].x + d_gaussian_sphere_clustered->points[i].y*d_gaussian_sphere_registered->points[pointIdxNKNSearch[0]].y + d_gaussian_sphere_clustered->points[i].z*d_gaussian_sphere_registered->points[pointIdxNKNSearch[0]].z)/norm_clusterd/norm_registered);
 			// double threshold_matching_norm_dif = ratio_matching_norm_dif*norm_clusterd;
 			// if(threshold_matching_norm_dif<min_matching_norm_dif)	threshold_matching_norm_dif = min_matching_norm_dif;
+			std::cout << "fabs(norm_clusterd-norm_registered) = |" << norm_clusterd << " - " << norm_registered << "| = " << fabs(norm_clusterd-norm_registered) << std::endl;
+			std::cout << "fabs(angle/M_PI*180.0) = " << fabs(angle/M_PI*180.0) << std::endl;
+			if(std::isnan(angle))	angle = 0.0;
 			if(fabs(norm_clusterd-norm_registered)<threshold_matching_norm_dif && fabs(angle/M_PI*180.0)<threshold_matching_angle && !list_walls[pointIdxNKNSearch[0]].found_match){
 				list_walls[pointIdxNKNSearch[0]].found_match = true;
 				list_walls[pointIdxNKNSearch[0]].count_match++;
@@ -569,6 +579,8 @@ bool PoseEstimationGaussianSphere::MatchWalls(void)
 							// double distance = sqrt(d_gaussian_sphere_clustered->points[i].x*d_gaussian_sphere_clustered->points[i].x + d_gaussian_sphere_clustered->points[i].y*d_gaussian_sphere_clustered->points[i].y + d_gaussian_sphere_clustered->points[i].z*d_gaussian_sphere_clustered->points[i].z);
 							// local_pose_error_rpy_sincosatan[j][0] += distance*sin(tmp_local_pose_error_rpy[j]);
 							// local_pose_error_rpy_sincosatan[j][1] += distance*cos(tmp_local_pose_error_rpy[j]);
+							local_pose_error_rpy_sincosatan[j][0] += list_num_dgauss_cluster_belongings[i]*sin(tmp_local_pose_error_rpy[j]);
+							local_pose_error_rpy_sincosatan[j][1] += list_num_dgauss_cluster_belongings[i]*cos(tmp_local_pose_error_rpy[j]);
 						}
 					}
 					succeeded_y = true;
@@ -663,7 +675,8 @@ void PoseEstimationGaussianSphere::KalmanFilterForRegistration(WallInfo& wall)
 			p.z;
 	Eigen::MatrixXd H = Eigen::MatrixXd::Identity(num_obs, num_state);
 	Eigen::MatrixXd jH = Eigen::MatrixXd::Identity(num_obs, num_state);
-	const double sigma_obs = 2.0e-1;
+	// const double sigma_obs = 5.0e-1*wall.count_match;
+	const double sigma_obs = 1.0e+10;
 	Eigen::MatrixXd R = sigma_obs*Eigen::MatrixXd::Identity(num_obs, num_obs);
 	Eigen::MatrixXd Y(num_obs, 1);
 	Eigen::MatrixXd S(num_obs, num_obs);
@@ -695,11 +708,16 @@ tf::Quaternion PoseEstimationGaussianSphere::GetRelativeRotation(pcl::PointXYZ o
 	
 	double rpy[3];
 	tf::Matrix3x3(relative_rotation).getRPY(rpy[0], rpy[1], rpy[2]);
-	std::cout << "local error: " << rpy[0] << ", " << rpy[1] << ", " << rpy[2] << std::endl;
-	std::cout << "distance: " << (Target - Origin).norm() << std::endl;
-	std::cout << "angle: " << acos(Origin.dot(Target)/Origin.norm()/Target.norm())/M_PI*180.0 << std::endl;
-	std::cout << "Origin: (" << Origin(0) << ", " << Origin(1) << ", " << Origin(2) << "), depth = " << Origin.norm() << std::endl;
-	std::cout << "Target: (" << Target(0) << ", " << Target(1) << ", " << Target(2) << "), depth = " << Target.norm() << std::endl;
+	if(std::isnan(theta)){
+		std::cout << "theta is NAN" << std::endl;
+		exit(1);
+	}
+
+	// std::cout << "local error: " << rpy[0] << ", " << rpy[1] << ", " << rpy[2] << std::endl;
+	// std::cout << "distance: " << (Target - Origin).norm() << std::endl;
+	// std::cout << "angle: " << acos(Origin.dot(Target)/Origin.norm()/Target.norm())/M_PI*180.0 << std::endl;
+	// std::cout << "Origin: (" << Origin(0) << ", " << Origin(1) << ", " << Origin(2) << "), depth = " << Origin.norm() << std::endl;
+	// std::cout << "Target: (" << Target(0) << ", " << Target(1) << ", " << Target(2) << "), depth = " << Target.norm() << std::endl;
 
 	return relative_rotation;
 }

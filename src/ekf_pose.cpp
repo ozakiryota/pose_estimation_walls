@@ -137,7 +137,7 @@ void EKFPose::PredictionIMU(sensor_msgs::Imu imu, double dt)
 	dfdx[1][1] = 1.0;
 	dfdx[1][2] = 0.0;
 	dfdx[2][0] = (cos(roll)/cos(pitch)*delta_p - sin(roll)/cos(pitch)*delta_y);
-	dfdx[2][1] = (-sin(roll)/sin(pitch)*delta_p - cos(roll)/sin(pitch)*delta_y);
+	dfdx[2][1] = (sin(roll)*sin(pitch)/cos(pitch)/cos(pitch)*delta_p + cos(roll)*sin(pitch)/cos(pitch)/cos(pitch)*delta_y);
 	dfdx[2][2] = 1.0;
 	Eigen::MatrixXd jF(num_state, num_state);
 	for(int i=0;i<num_state;i++){
@@ -150,16 +150,17 @@ void EKFPose::PredictionIMU(sensor_msgs::Imu imu, double dt)
 	//  		0,	1.0e-1,	0,
 	// 		0,	0,	5.0e+5;
 	
-	// X = F;
-	// for(int i=0;i<3;i++){
-	// 	if(X(i, 0)>M_PI)	X(i, 0) -= 2.0*M_PI;
-	// 	if(X(i, 0)<-M_PI)	X(i, 0) += 2.0*M_PI;
-	// }
-	tf::Quaternion q_relative_rotation = tf::createQuaternionFromRPY(delta_r, delta_p, delta_y);
-	q_pose = q_pose*q_relative_rotation;
-	q_pose.normalize();
-	tf::Matrix3x3(q_pose).getRPY(X(0, 0), X(1, 0), X(2, 0));
-	// q_pose = tf::createQuaternionFromRPY(X(0, 0), X(1, 0), X(2, 0));
+	X = F;
+	for(int i=0;i<3;i++){
+		if(X(i, 0)>M_PI)	X(i, 0) -= 2.0*M_PI;
+		if(X(i, 0)<-M_PI)	X(i, 0) += 2.0*M_PI;
+	}
+	q_pose = tf::createQuaternionFromRPY(X(0, 0), X(1, 0), X(2, 0));
+
+	// tf::Quaternion q_relative_rotation = tf::createQuaternionFromRPY(delta_r, delta_p, delta_y);
+	// q_pose = q_pose*q_relative_rotation;
+	// q_pose.normalize();
+	// tf::Matrix3x3(q_pose).getRPY(X(0, 0), X(1, 0), X(2, 0));
 
 	P = jF*P*jF.transpose() + Q;
 }

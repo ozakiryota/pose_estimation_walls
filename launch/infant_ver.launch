@@ -3,7 +3,7 @@
 	<param name="use_sim_time" value="true"/>
 
 	<!-- rosbag -->
-	<node pkg="rosbag" type="play" name="player" args="--clock /home/amsl/ozaki/bagfiles/infant/2018-12-12-18-38-39.bag"/>
+	<node pkg="rosbag" type="play" name="player" args="--clock /home/amsl/ozaki/bagfiles/infant/2018-12-12-18-38-39.bag -s 50"/>
 	<!-- <node pkg="rosbag" type="play" name="player" args="&#45;&#45;clock /home/amsl/ozaki/bagfiles/infant_mocap/2018&#45;12&#45;09&#45;14&#45;40&#45;09.bag"/> -->
 
 	<!-- rviz -->
