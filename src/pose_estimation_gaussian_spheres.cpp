@@ -107,21 +107,24 @@ PoseEstimationGaussianSphere::PoseEstimationGaussianSphere()
 	g_vector_walls = g_vector_from_ekf;
 	rpy_pub.data.resize(3);
 }
-
+#include <thread>
 void PoseEstimationGaussianSphere::CallbackPC(const sensor_msgs::PointCloud2ConstPtr &msg)
 {
 	// std::cout << "CALLBACK PC" << std::endl;
 	pcl::fromROSMsg(*msg, *cloud);
 	time_pub = msg->header.stamp;
-	if(inipose_is_available)	pcl::transformPointCloud(*cloud, *cloud, Eigen::Vector3f(0.0, 0.0, 0.0), lidar_alignment);
+	// if(inipose_is_available)	pcl::transformPointCloud(*cloud, *cloud, Eigen::Vector3f(0.0, 0.0, 0.0), lidar_alignment);
 	ClearPoints();
 	FittingWalls();
 	ClusterGauss();
 	ClusterDGauss();
 	if(!first_callback_odom){
-		bool succeeded_rp = GVectorEstimation();
+		// bool succeeded_rp = GVectorEstimation();
+		bool succeeded_rp;
+		auto thread_rp = std::thread([&succeeded_rp, this]{succeeded_rp = GVectorEstimation();});
 		CreateRegisteredCentroidCloud();
 		bool succeeded_y = MatchWalls();
+		thread_rp.join();
 		if(!succeeded_rp){
 			rpy_pub.data[0] = NAN;
 			rpy_pub.data[1] = NAN;
@@ -197,8 +200,8 @@ void PoseEstimationGaussianSphere::FittingWalls(void)
 
 	kdtree.setInputCloud(cloud);
 
-	// const size_t skip_step = 3;
-	const size_t skip_step = 7;
+	const size_t skip_step = 3;
+	// const size_t skip_step = 7;
 	for(size_t i=0;i<cloud->points.size();i+=skip_step){
 		bool input_to_gauss = true;
 		bool input_to_dgauss = true;

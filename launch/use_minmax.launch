@@ -1,0 +1,33 @@
+<launch>
+	<!-- global rosparam -->
+	<param name="use_sim_time" value="true"/>
+
+	<!-- rosbag -->
+	<node pkg="rosbag" type="play" name="player" args="--clock /home/amsl/ozaki/bagfiles/velodyne_realsense/2018-10-06-12-14-59.bag -s 110"/>
+
+	<!-- rviz -->
+	<!-- <node pkg="rviz" type="rviz" name="rviz_startpoint" args="&#45;d /home/amsl/.rviz/trajectories_startpoint.rviz"/> -->
+	<node pkg="rviz" type="rviz" name="rviz_skyview" args="-d /home/amsl/.rviz/trajectories_skyview.rviz"/>
+
+	<!-- sensor driver -->
+	<include file="$(find velodyne_pointcloud)/launch/32e_points.launch"/>
+
+	<!-- minmax -->
+	<node pkg="velodyne_height_map" type="rm_ground_node_minmax" name="rm_ground"/>
+
+	<!-- proposed method -->
+	<node pkg="pose_estimation_walls" name="imu_initial_alignment" type="imu_initial_alignment" output="screen"/>
+	<node pkg="pose_estimation_walls" name="ekf_pose" type="ekf_pose" output="screen"/>
+	<node pkg="pose_estimation_walls" name="pose_estimation_gaussian_spheres" type="pose_estimation_gaussian_spheres" output="screen">
+		<remap from="/velodyne_points" to="/rm_ground2"/>
+	</node>
+	<node pkg="pose_estimation_walls" name="combine_linearvelocity_and_pose" type="combine_linearvelocity_and_pose"/>
+
+	<!-- comparisons	 -->
+	<node pkg="pose_estimation_walls" name="gyrodometry" type="gyrodometry"/>
+	<include file="$(find loam_velodyne)/launch/hector_loam_velodyne.launch"/>
+	<node pkg="pose_estimation_walls" name="odom_creater_for_loamvelodyne" type="odom_creater_for_loamvelodyne"/>
+
+	<!-- graph -->
+	<!-- <node pkg="pose_estimation_walls" name="graph_rpy" type="graph_rpy.py"/> -->
+</launch>
