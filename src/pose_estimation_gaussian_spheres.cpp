@@ -197,7 +197,8 @@ void PoseEstimationGaussianSphere::FittingWalls(void)
 
 	kdtree.setInputCloud(cloud);
 
-	const size_t skip_step = 3;
+	// const size_t skip_step = 3;
+	const size_t skip_step = 7;
 	for(size_t i=0;i<cloud->points.size();i+=skip_step){
 		bool input_to_gauss = true;
 		bool input_to_dgauss = true;
@@ -212,7 +213,7 @@ void PoseEstimationGaussianSphere::FittingWalls(void)
 		/*judge*/
 		// const size_t threshold_num_neighborpoints_gauss = 20;
 		// const size_t threshold_num_neighborpoints_dgauss = 5;
-		const size_t threshold_num_neighborpoints_gauss = 5;
+		const size_t threshold_num_neighborpoints_gauss = 20;
 		const size_t threshold_num_neighborpoints_dgauss = 5;
 		if(indices.size()<threshold_num_neighborpoints_gauss)	input_to_gauss = false;
 		if(indices.size()<threshold_num_neighborpoints_dgauss)	input_to_dgauss = false;
@@ -423,7 +424,7 @@ void PoseEstimationGaussianSphere::ClusterDGauss(void)
 	// std::cout << "POINT CLUSTER" << std::endl;
 	const double cluster_distance = 0.3;
 	// const int min_num_cluster_belongings = 20;
-	const int min_num_cluster_belongings = 30;
+	const int min_num_cluster_belongings = 15;
 	pcl::search::KdTree<pcl::PointXYZ>::Ptr tree (new pcl::search::KdTree<pcl::PointXYZ>);
 	tree->setInputCloud(d_gaussian_sphere);
 	std::vector<pcl::PointIndices> cluster_indices;
