@@ -130,7 +130,8 @@ void PoseEstimationGaussianSphere::CallbackPC(const sensor_msgs::PointCloud2Cons
 	ClearPoints();
 	// FittingWalls();
 	kdtree.setInputCloud(cloud);
-	const int num_threads = 100;
+	const int num_threads = 50;
+	std::cout << "cloud->points.size() = " << cloud->points.size() << std::endl;
 	std::vector<std::thread> threads_fittingwalls;
 	std::vector<FittingWalls_> objects;
 	for(int i=0;i<num_threads;i++){
@@ -512,7 +513,7 @@ bool PoseEstimationGaussianSphere::GVectorEstimation(void)
 	/*flip*/
 	flipNormalTowardsViewpoint(g_vector_walls, 0.0, 0.0, -100.0, g_vector_walls.normal_x, g_vector_walls.normal_y, g_vector_walls.normal_z);
 	/*if angle variation is too large, estimation would be wrong*/
-	const double threshold_angle_variation = 60.0;	//[deg]
+	const double threshold_angle_variation = 30.0;	//[deg]
 	if(fabs(AngleBetweenVectors(g_vector_walls, g_vector_from_ekf))>threshold_angle_variation/180.0*M_PI){
 		std::cout << ">> angle variation of g in 1 step is too large and would be wrong " << std::endl;
 		return false;
@@ -547,7 +548,7 @@ void PoseEstimationGaussianSphere::ClusterDGauss(void)
 	// std::cout << "POINT CLUSTER" << std::endl;
 	const double cluster_distance = 0.3;
 	// const int min_num_cluster_belongings = 20;
-	const int min_num_cluster_belongings = 30;
+	const int min_num_cluster_belongings = 5;
 	pcl::search::KdTree<pcl::PointXYZ>::Ptr tree (new pcl::search::KdTree<pcl::PointXYZ>);
 	tree->setInputCloud(d_gaussian_sphere);
 	std::vector<pcl::PointIndices> cluster_indices;
@@ -700,9 +701,9 @@ bool PoseEstimationGaussianSphere::MatchWalls(void)
 							// local_pose_error_rpy_sincosatan[j][1] += cos(tmp_local_pose_error_rpy[j]);
 							local_pose_error_rpy_sincosatan[j][0] += list_walls[pointIdxNKNSearch[0]].count_match*sin(tmp_local_pose_error_rpy[j]);
 							local_pose_error_rpy_sincosatan[j][1] += list_walls[pointIdxNKNSearch[0]].count_match*cos(tmp_local_pose_error_rpy[j]);
-							double distance = sqrt(d_gaussian_sphere_clustered->points[i].x*d_gaussian_sphere_clustered->points[i].x + d_gaussian_sphere_clustered->points[i].y*d_gaussian_sphere_clustered->points[i].y + d_gaussian_sphere_clustered->points[i].z*d_gaussian_sphere_clustered->points[i].z);
-							local_pose_error_rpy_sincosatan[j][0] += distance*sin(tmp_local_pose_error_rpy[j]);
-							local_pose_error_rpy_sincosatan[j][1] += distance*cos(tmp_local_pose_error_rpy[j]);
+							// double distance = sqrt(d_gaussian_sphere_clustered->points[i].x*d_gaussian_sphere_clustered->points[i].x + d_gaussian_sphere_clustered->points[i].y*d_gaussian_sphere_clustered->points[i].y + d_gaussian_sphere_clustered->points[i].z*d_gaussian_sphere_clustered->points[i].z);
+							// local_pose_error_rpy_sincosatan[j][0] += distance*sin(tmp_local_pose_error_rpy[j]);
+							// local_pose_error_rpy_sincosatan[j][1] += distance*cos(tmp_local_pose_error_rpy[j]);
 							local_pose_error_rpy_sincosatan[j][0] += list_num_dgauss_cluster_belongings[i]*sin(tmp_local_pose_error_rpy[j]);
 							local_pose_error_rpy_sincosatan[j][1] += list_num_dgauss_cluster_belongings[i]*cos(tmp_local_pose_error_rpy[j]);
 						}
