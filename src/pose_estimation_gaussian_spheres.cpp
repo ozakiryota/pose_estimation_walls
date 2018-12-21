@@ -786,9 +786,11 @@ bool PoseEstimationGaussianSphere::MatchWalls(void)
 			std::cout << "succeeded matching" << std::endl;
 
 
-			double tmp_rpy[3];
-			tf::Matrix3x3(q_pose_odom_now*q_ave_local_pose_error).getRPY(tmp_rpy[0], tmp_rpy[1], tmp_rpy[2]);
-			q_y_correction = tf::createQuaternionFromRPY(0.0, 0.0, tmp_rpy[2]);
+			double rpy_last[3];
+			double rpy_new[3];
+			tf::Matrix3x3(q_pose_odom_now).getRPY(rpy_last[0], rpy_last[1], rpy_last[2]);
+			tf::Matrix3x3(q_pose_odom_now*q_ave_local_pose_error).getRPY(rpy_new[0], rpy_new[1], rpy_new[2]);
+			q_y_correction = tf::createQuaternionFromRPY(0.0, 0.0, atan2(sin(rpy_new[2] - rpy_last[2]), cos(rpy_new[2] - rpy_last[2])));
 		}
 		return succeeded_y;
 	}
