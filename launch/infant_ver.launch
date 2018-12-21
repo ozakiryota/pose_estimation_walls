@@ -4,10 +4,11 @@
 
 	<!-- rosbag -->
 	<node pkg="rosbag" type="play" name="player" args="--clock /home/amsl/ozaki/bagfiles/infant/2018-12-12-18-38-39.bag -s 50"/>
-	<!-- <node pkg="rosbag" type="play" name="player" args="&#45;&#45;clock /home/amsl/ozaki/bagfiles/infant_mocap/2018&#45;12&#45;09&#45;14&#45;40&#45;09.bag"/> -->
+	<!-- <node pkg="rosbag" type="play" name="player" args="&#45;&#45;clock /home/amsl/ozaki/bagfiles/infant/2018&#45;12&#45;18&#45;21&#45;50&#45;17.bag &#45;s 50"/> -->
+	<!-- <node pkg="rosbag" type="play" name="player" args="&#45;&#45;clock /home/amsl/ozaki/bagfiles/infant/2018&#45;12&#45;20&#45;17&#45;55&#45;03.bag &#45;s 50"/> -->
 
 	<!-- rviz -->
-	<!-- <node pkg="rviz" type="rviz" name="rviz_startpoint" args="&#45;d /home/amsl/.rviz/trajectories_startpoint.rviz"/> -->
+	<node pkg="rviz" type="rviz" name="rviz_startpoint" args="-d /home/amsl/.rviz/trajectories_startpoint.rviz"/>
 	<!-- <node pkg="rviz" type="rviz" name="rviz_skyview" args="&#45;d /home/amsl/.rviz/trajectories_skyview.rviz"/> -->
 
 	<!-- sensor driver -->
@@ -15,6 +16,10 @@
 	<!-- <node pkg="image_transport" type="republish" name="republish" args="compressed raw"> -->
 	<!-- 	<remap from="in" to="/usb_cam/image_raw"/> -->
 	<!-- 	<remap from="out" to="/usb_cam/image_raw"/> -->
+	<!-- </node> -->
+	<!-- <node pkg="image_transport" type="republish" name="republish" args="compressed raw"> -->
+	<!-- 	<remap from="in" to="/camera/color/image_raw"/> -->
+	<!-- 	<remap from="out" to="/camera/color/image_raw"/> -->
 	<!-- </node> -->
 
 	<!-- proposed method -->

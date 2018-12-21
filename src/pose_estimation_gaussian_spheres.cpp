@@ -14,6 +14,7 @@
 #include <pcl/visualization/cloud_viewer.h>
 #include <tf/tf.h>
 #include <thread>
+#include <omp.h>
 
 class PoseEstimationGaussianSphere{
 	private:
@@ -68,6 +69,9 @@ class PoseEstimationGaussianSphere{
 		/*flags*/
 		bool first_callback_odom = true;
 		bool inipose_is_available = false;
+		/*test*/
+		tf::Quaternion q_rp_correction;
+		tf::Quaternion q_y_correction;
 	public:
 		PoseEstimationGaussianSphere();
 		void CallbackPC(const sensor_msgs::PointCloud2ConstPtr &msg);
@@ -82,6 +86,7 @@ class PoseEstimationGaussianSphere{
 		void ClusterGauss(void);
 		bool GVectorEstimation(void);
 		void PartialRotation(void);
+		tf::Quaternion GetRelativeRotationNormals(pcl::PointNormal origin, pcl::PointNormal target);
 		void ClusterDGauss(void);
 		void CreateRegisteredCentroidCloud(void);
 		pcl::PointXYZ PointTransformation(pcl::PointXYZ p, nav_msgs::Odometry origin, nav_msgs::Odometry target);
@@ -128,9 +133,10 @@ void PoseEstimationGaussianSphere::CallbackPC(const sensor_msgs::PointCloud2Cons
 	time_pub = msg->header.stamp;
 	if(inipose_is_available)	pcl::transformPointCloud(*cloud, *cloud, Eigen::Vector3f(0.0, 0.0, 0.0), lidar_alignment);
 	ClearPoints();
-	// FittingWalls();
 	kdtree.setInputCloud(cloud);
-	const int num_threads = 50;
+	// const int num_threads = 50;
+	const int num_threads = std::thread::hardware_concurrency();
+	std::cout << "std::thread::hardware_concurrency() = " << std::thread::hardware_concurrency() << std::endl;
 	std::cout << "cloud->points.size() = " << cloud->points.size() << std::endl;
 	std::vector<std::thread> threads_fittingwalls;
 	std::vector<FittingWalls_> objects;
@@ -149,16 +155,22 @@ void PoseEstimationGaussianSphere::CallbackPC(const sensor_msgs::PointCloud2Cons
 	for(int i=0;i<num_threads;i++)	objects[i].Merge(*this);
 
 	if(!first_callback_odom){
-		// bool succeeded_rp = GVectorEstimation();
 		bool succeeded_rp;
 		auto thread_rp = std::thread([&succeeded_rp, this]{
-				ClusterGauss();
-				succeeded_rp = GVectorEstimation();
+			ClusterGauss();
+			succeeded_rp = GVectorEstimation();
 		});
 		ClusterDGauss();
 		CreateRegisteredCentroidCloud();
 		bool succeeded_y = MatchWalls();
 		thread_rp.join();
+
+		tf::Quaternion q_pose_odom_now;
+		quaternionMsgToTF(odom_now.pose.pose.orientation, q_pose_odom_now);
+		tf::Quaternion q_pose_new = q_pose_odom_now;
+		if(succeeded_rp)	q_pose_new = q_pose_new*q_rp_correction;
+		if(succeeded_y)	q_pose_new = q_y_correction*q_pose_new;
+		tf::Matrix3x3(q_pose_new).getRPY(rpy_pub.data[0], rpy_pub.data[1], rpy_pub.data[2]);
 		if(!succeeded_rp){
 			rpy_pub.data[0] = NAN;
 			rpy_pub.data[1] = NAN;
@@ -313,8 +325,6 @@ void PoseEstimationGaussianSphere::FittingWalls_::Compute(PoseEstimationGaussian
 	// std::cout << "NORMAL ESTIMATION" << std::endl;
 
 	const size_t skip_step = 3;
-	// const size_t skip_step = 7;
-	// for(size_t i=0;i<cloud->points.size();i+=skip_step){
 	for(size_t i=i_start;i<i_end;i+=skip_step){
 		bool input_to_gauss = true;
 		bool input_to_dgauss = true;
@@ -330,7 +340,7 @@ void PoseEstimationGaussianSphere::FittingWalls_::Compute(PoseEstimationGaussian
 		// const size_t threshold_num_neighborpoints_gauss = 20;
 		// const size_t threshold_num_neighborpoints_dgauss = 5;
 		const size_t threshold_num_neighborpoints_gauss = 20;
-		const size_t threshold_num_neighborpoints_dgauss = 5;
+		const size_t threshold_num_neighborpoints_dgauss = 20;
 		if(indices.size()<threshold_num_neighborpoints_gauss)	input_to_gauss = false;
 		if(indices.size()<threshold_num_neighborpoints_dgauss)	input_to_dgauss = false;
 		if(!input_to_gauss && !input_to_dgauss)	continue;
@@ -418,14 +428,22 @@ double PoseEstimationGaussianSphere::ComputeSquareError(Eigen::Vector4f plane_pa
 {
 	double sum_square_error = 0.0;
 	for(size_t i=0;i<indices.size();i++){
-		double square_error =	fabs(plane_parameters[0]*cloud->points[indices[i]].x
+		// double square_error =	fabs(plane_parameters[0]*cloud->points[indices[i]].x
+		// 							+plane_parameters[1]*cloud->points[indices[i]].y
+		// 							+plane_parameters[2]*cloud->points[indices[i]].z
+		// 							+plane_parameters[3])
+		// 						/sqrt(plane_parameters[0]*plane_parameters[0]
+		// 							+plane_parameters[1]*plane_parameters[1]
+		// 							+plane_parameters[2]*plane_parameters[2]);
+		// sum_square_error += square_error/(double)indices.size();
+		sum_square_error +=		fabs(plane_parameters[0]*cloud->points[indices[i]].x
 									+plane_parameters[1]*cloud->points[indices[i]].y
 									+plane_parameters[2]*cloud->points[indices[i]].z
 									+plane_parameters[3])
 								/sqrt(plane_parameters[0]*plane_parameters[0]
 									+plane_parameters[1]*plane_parameters[1]
-									+plane_parameters[2]*plane_parameters[2]);
-		sum_square_error += square_error/(double)indices.size();
+									+plane_parameters[2]*plane_parameters[2])
+								/(double)indices.size();
 	}
 	return sum_square_error;
 }
@@ -518,16 +536,17 @@ bool PoseEstimationGaussianSphere::GVectorEstimation(void)
 		std::cout << ">> angle variation of g in 1 step is too large and would be wrong " << std::endl;
 		return false;
 	}
-	/*normalization*/
-	double norm_g = sqrt(g_vector_walls.normal_x*g_vector_walls.normal_x + g_vector_walls.normal_y*g_vector_walls.normal_y + g_vector_walls.normal_z*g_vector_walls.normal_z);
-	g_vector_walls.normal_x /= norm_g;
-	g_vector_walls.normal_y /= norm_g;
-	g_vector_walls.normal_z /= norm_g;
-	/*convertion to roll, pitch*/
-	rpy_pub.data[0] = atan2(-g_vector_walls.normal_y, -g_vector_walls.normal_z);
-	rpy_pub.data[1] = atan2(g_vector_walls.normal_x, sqrt(-g_vector_walls.normal_y*-g_vector_walls.normal_y + -g_vector_walls.normal_z*-g_vector_walls.normal_z));
+	// #<{(|normalization|)}>#
+	// double norm_g = sqrt(g_vector_walls.normal_x*g_vector_walls.normal_x + g_vector_walls.normal_y*g_vector_walls.normal_y + g_vector_walls.normal_z*g_vector_walls.normal_z);
+	// g_vector_walls.normal_x /= norm_g;
+	// g_vector_walls.normal_y /= norm_g;
+	// g_vector_walls.normal_z /= norm_g;
+	// #<{(|convertion to roll, pitch|)}>#
 	// rpy_pub.data[0] = atan2(-g_vector_walls.normal_y, -g_vector_walls.normal_z);
-	// rpy_pub.data[1] = atan2(g_vector_walls.normal_x, -g_vector_walls.normal_y*sin(rpy_pub.data[0]) + -g_vector_walls.normal_z*cos(rpy_pub.data[0]));
+	// rpy_pub.data[1] = atan2(g_vector_walls.normal_x, sqrt(-g_vector_walls.normal_y*-g_vector_walls.normal_y + -g_vector_walls.normal_z*-g_vector_walls.normal_z));
+	
+	q_rp_correction = GetRelativeRotationNormals(g_vector_from_ekf, g_vector_walls).inverse();
+
 	return true;
 }
 
@@ -543,12 +562,26 @@ void PoseEstimationGaussianSphere::PartialRotation(void)
 	g_vector_walls.normal_z = g_vector_from_ekf.normal_z - dot_product*gaussian_sphere_clustered->points[0].z;
 }
 
+tf::Quaternion PoseEstimationGaussianSphere::GetRelativeRotationNormals(pcl::PointNormal origin, pcl::PointNormal target)
+{
+	Eigen::Vector3d Origin(origin.normal_x, origin.normal_y, origin.normal_z);
+	Eigen::Vector3d Target(target.normal_x, target.normal_y, target.normal_z);
+	double theta = acos(Origin.dot(Target)/Origin.norm()/Target.norm());
+	Eigen::Vector3d Axis = Origin.cross(Target);
+	Axis.normalize();
+	tf::Quaternion relative_rotation(sin(theta/2.0)*Axis(0), sin(theta/2.0)*Axis(1), sin(theta/2.0)*Axis(2), cos(theta/2.0));
+	relative_rotation.normalize();
+
+	return relative_rotation;
+}
+
 void PoseEstimationGaussianSphere::ClusterDGauss(void)
 {
 	// std::cout << "POINT CLUSTER" << std::endl;
-	const double cluster_distance = 0.3;
+	// const double cluster_distance = 0.3;
+	const double cluster_distance = 0.5;
 	// const int min_num_cluster_belongings = 20;
-	const int min_num_cluster_belongings = 5;
+	const int min_num_cluster_belongings = 10;
 	pcl::search::KdTree<pcl::PointXYZ>::Ptr tree (new pcl::search::KdTree<pcl::PointXYZ>);
 	tree->setInputCloud(d_gaussian_sphere);
 	std::vector<pcl::PointIndices> cluster_indices;
@@ -664,10 +697,10 @@ bool PoseEstimationGaussianSphere::MatchWalls(void)
 		// const double min_matching_norm_dif = 0.5;	//[m]
 		// const double threshold_matching_norm_dif = 1.0;	//[m]
 		// const double threshold_matching_angle = 15.0;	//[deg]
-		const double threshold_matching_norm_dif = 1.0;	//[m]
-		const double threshold_matching_angle = 30.0;	//[deg]
+		const double threshold_matching_norm_dif = 0.5;	//[m]
+		const double threshold_matching_angle = 40.0;	//[deg]
 		// const int threshold_count_match = 5;
-		const int threshold_count_match = 2;
+		const int threshold_count_match = 5;
 		const int k = 1;
 		kdtree.setInputCloud(d_gaussian_sphere_registered);
 		for(size_t i=0;i<d_gaussian_sphere_clustered->points.size();i++){
@@ -752,10 +785,10 @@ bool PoseEstimationGaussianSphere::MatchWalls(void)
 			quaternionTFToMsg(q_pose_odom_now*q_ave_local_pose_error, pose_pub.pose.orientation);
 			std::cout << "succeeded matching" << std::endl;
 
+
 			double tmp_rpy[3];
 			tf::Matrix3x3(q_pose_odom_now*q_ave_local_pose_error).getRPY(tmp_rpy[0], tmp_rpy[1], tmp_rpy[2]);
-			rpy_pub.data[2] = tmp_rpy[2];
-			std::cout << "q_ave_local_pose_error: " << tmp_rpy[0] << ", " << tmp_rpy[1] << ", " << tmp_rpy[2] << std::endl;
+			q_y_correction = tf::createQuaternionFromRPY(0.0, 0.0, tmp_rpy[2]);
 		}
 		return succeeded_y;
 	}
@@ -800,8 +833,9 @@ void PoseEstimationGaussianSphere::KalmanFilterForRegistration(WallInfo& wall)
 			p.z;
 	Eigen::MatrixXd H = Eigen::MatrixXd::Identity(num_obs, num_state);
 	Eigen::MatrixXd jH = Eigen::MatrixXd::Identity(num_obs, num_state);
-	// const double sigma_obs = 5.0e-1*wall.count_match;
-	const double sigma_obs = 1.0e+10;
+	const double sigma_obs = 5.0e-1*wall.count_match;
+	// const double sigma_obs = 1.0e+10;
+	std::cout << "sigma_obs = " << sigma_obs << std::endl;
 	Eigen::MatrixXd R = sigma_obs*Eigen::MatrixXd::Identity(num_obs, num_obs);
 	Eigen::MatrixXd Y(num_obs, 1);
 	Eigen::MatrixXd S(num_obs, num_obs);
