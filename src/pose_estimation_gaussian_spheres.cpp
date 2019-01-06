@@ -66,17 +66,17 @@ class PoseEstimationGaussianSphere{
 		double rp_sincos_calibration[2][2] = {};
 		Eigen::Quaternionf lidar_alignment{1.0, 0.0, 0.0, 0.0};
 		ros::Time time_pub;
+		tf::Quaternion q_rp_correction;
+		tf::Quaternion q_y_correction;
 		/*flags*/
 		bool first_callback_odom = true;
 		bool inipose_is_available = false;
-		/*test*/
-		tf::Quaternion q_rp_correction;
-		tf::Quaternion q_y_correction;
+		const bool mode_no_d_gauss = true;
 	public:
 		PoseEstimationGaussianSphere();
 		void CallbackPC(const sensor_msgs::PointCloud2ConstPtr &msg);
 		void CallbackOdom(const nav_msgs::OdometryConstPtr& msg);
-		void ConvertionPoseToGVector(void);
+		pcl::PointNormal ConvertionPoseToGVector(tf::Quaternion q_pose);
 		void CallbackInipose(const geometry_msgs::QuaternionConstPtr& msg);
 		void ClearPoints(void);
 		void FittingWalls(void);
@@ -94,6 +94,7 @@ class PoseEstimationGaussianSphere{
 		void InputNewWallInfo(pcl::PointXYZ p);
 		void KalmanFilterForRegistration(WallInfo& wall);
 		tf::Quaternion GetRelativeRotation(pcl::PointXYZ orgin, pcl::PointXYZ target);
+		void FinalEstimation(bool succeeded_rp, bool succeeded_y);
 		void Visualization(void);
 		void Publication(void);
 	protected:
@@ -117,7 +118,7 @@ PoseEstimationGaussianSphere::PoseEstimationGaussianSphere()
 	pub_rpy = nh.advertise<std_msgs::Float64MultiArray>("/rpy_walls", 1);
 	pub_pose = nh.advertise<geometry_msgs::PoseStamped>("/pose_dgauss", 1);
 	viewer.setBackgroundColor(1, 1, 1);
-	viewer.addCoordinateSystem(0.5, "axis");
+	viewer.addCoordinateSystem(0.8, "axis");
 	viewer.setCameraPosition(0.0, 0.0, 50.0, 0.0, 0.0, 0.0);
 	g_vector_from_ekf.x = 0.0;
 	g_vector_from_ekf.y = 0.0;
@@ -156,33 +157,42 @@ void PoseEstimationGaussianSphere::CallbackPC(const sensor_msgs::PointCloud2Cons
 
 	if(!first_callback_odom){
 		bool succeeded_rp;
+		bool succeeded_y = false;
 		auto thread_rp = std::thread([&succeeded_rp, this]{
 			ClusterGauss();
 			succeeded_rp = GVectorEstimation();
 		});
-		ClusterDGauss();
-		CreateRegisteredCentroidCloud();
-		bool succeeded_y = MatchWalls();
+		if(!mode_no_d_gauss){
+			ClusterDGauss();
+			CreateRegisteredCentroidCloud();
+			succeeded_y = MatchWalls();
+		}
 		thread_rp.join();
 
-		tf::Quaternion q_pose_odom_now;
-		quaternionMsgToTF(odom_now.pose.pose.orientation, q_pose_odom_now);
-		tf::Quaternion q_pose_new = q_pose_odom_now;
-		if(succeeded_rp)	q_pose_new = q_pose_new*q_rp_correction;
-		if(succeeded_y)	q_pose_new = q_y_correction*q_pose_new;
-		tf::Matrix3x3(q_pose_new).getRPY(rpy_pub.data[0], rpy_pub.data[1], rpy_pub.data[2]);
-		if(!succeeded_rp){
-			rpy_pub.data[0] = NAN;
-			rpy_pub.data[1] = NAN;
+		// tf::Quaternion q_pose_odom_now;
+		// quaternionMsgToTF(odom_now.pose.pose.orientation, q_pose_odom_now);
+		// tf::Quaternion q_pose_new = q_pose_odom_now;
+		// succeeded_rp = false;
+		// if(succeeded_rp)	q_pose_new = q_pose_new*q_rp_correction;
+		// // if(succeeded_y)	q_pose_new = q_y_correction*q_pose_new;
+		// if(succeeded_y)	q_pose_new = q_pose_new*q_y_correction;
+		// tf::Matrix3x3(q_pose_new).getRPY(rpy_pub.data[0], rpy_pub.data[1], rpy_pub.data[2]);
+		// if(!succeeded_rp){
+		// 	rpy_pub.data[0] = NAN;
+		// 	rpy_pub.data[1] = NAN;
+		// }
+		// else if(!inipose_is_available){
+		// 	rp_sincos_calibration[0][0] += sin(rpy_pub.data[0]);
+		// 	rp_sincos_calibration[0][1] += cos(rpy_pub.data[0]);
+		// 	rp_sincos_calibration[1][0] += sin(rpy_pub.data[1]);
+		// 	rp_sincos_calibration[1][1] += cos(rpy_pub.data[1]);
+		// }
+		// if(!succeeded_y)	rpy_pub.data[2] = NAN;
+
+		if(succeeded_rp || succeeded_y){
+			FinalEstimation(succeeded_rp, succeeded_y);
+			Publication();
 		}
-		else if(!inipose_is_available){
-			rp_sincos_calibration[0][0] += sin(rpy_pub.data[0]);
-			rp_sincos_calibration[0][1] += cos(rpy_pub.data[0]);
-			rp_sincos_calibration[1][0] += sin(rpy_pub.data[1]);
-			rp_sincos_calibration[1][1] += cos(rpy_pub.data[1]);
-		}
-		if(!succeeded_y)	rpy_pub.data[2] = NAN;
-		if(succeeded_rp || succeeded_y)	Publication();
 	}
 	Visualization();
 }
@@ -191,20 +201,22 @@ void PoseEstimationGaussianSphere::CallbackOdom(const nav_msgs::OdometryConstPtr
 {
 	// std::cout << "CALLBACK ODOM" << std::endl;
 	odom_now = *msg;
-	ConvertionPoseToGVector();
+	tf::Quaternion q_pose_from_ekf;
+	quaternionMsgToTF(odom_now.pose.pose.orientation, q_pose_from_ekf);
+	g_vector_from_ekf = ConvertionPoseToGVector(q_pose_from_ekf);
 
 	first_callback_odom = false;
 }
 
-void PoseEstimationGaussianSphere::ConvertionPoseToGVector(void)
+pcl::PointNormal PoseEstimationGaussianSphere::ConvertionPoseToGVector(tf::Quaternion q_pose)
 {
-	tf::Quaternion q_pose_from_ekf;
-	quaternionMsgToTF(odom_now.pose.pose.orientation, q_pose_from_ekf);
+	pcl::PointNormal g_vector;
 	tf::Quaternion q_g_vector_global(0.0, 0.0, -1.0, 0.0);
-	tf::Quaternion q_g_vector_local = q_pose_from_ekf.inverse()*q_g_vector_global*q_pose_from_ekf;
-	g_vector_from_ekf.normal_x = q_g_vector_local.x();
-	g_vector_from_ekf.normal_y = q_g_vector_local.y();
-	g_vector_from_ekf.normal_z = q_g_vector_local.z();
+	tf::Quaternion q_g_vector_local = q_pose.inverse()*q_g_vector_global*q_pose;
+	g_vector.normal_x = q_g_vector_local.x();
+	g_vector.normal_y = q_g_vector_local.y();
+	g_vector.normal_z = q_g_vector_local.z();
+	return g_vector;
 }
 
 void PoseEstimationGaussianSphere::CallbackInipose(const geometry_msgs::QuaternionConstPtr& msg)
@@ -390,7 +402,7 @@ void PoseEstimationGaussianSphere::FittingWalls_::Compute(PoseEstimationGaussian
 			gaussian_sphere_->points.push_back(tmp_point);
 		}
 		/*d-gaussian sphere*/
-		if(input_to_dgauss){
+		if(input_to_dgauss && !mainclass.mode_no_d_gauss){
 			tmp_point.x = -plane_parameters[3]*plane_parameters[0];
 			tmp_point.y = -plane_parameters[3]*plane_parameters[1];
 			tmp_point.z = -plane_parameters[3]*plane_parameters[2];
@@ -545,7 +557,7 @@ bool PoseEstimationGaussianSphere::GVectorEstimation(void)
 	// rpy_pub.data[0] = atan2(-g_vector_walls.normal_y, -g_vector_walls.normal_z);
 	// rpy_pub.data[1] = atan2(g_vector_walls.normal_x, sqrt(-g_vector_walls.normal_y*-g_vector_walls.normal_y + -g_vector_walls.normal_z*-g_vector_walls.normal_z));
 	
-	q_rp_correction = GetRelativeRotationNormals(g_vector_from_ekf, g_vector_walls).inverse();
+	// q_rp_correction = GetRelativeRotationNormals(g_vector_from_ekf, g_vector_walls).inverse();
 
 	return true;
 }
@@ -785,12 +797,12 @@ bool PoseEstimationGaussianSphere::MatchWalls(void)
 			quaternionTFToMsg(q_pose_odom_now*q_ave_local_pose_error, pose_pub.pose.orientation);
 			std::cout << "succeeded matching" << std::endl;
 
-
 			double rpy_last[3];
 			double rpy_new[3];
 			tf::Matrix3x3(q_pose_odom_now).getRPY(rpy_last[0], rpy_last[1], rpy_last[2]);
 			tf::Matrix3x3(q_pose_odom_now*q_ave_local_pose_error).getRPY(rpy_new[0], rpy_new[1], rpy_new[2]);
 			q_y_correction = tf::createQuaternionFromRPY(0.0, 0.0, atan2(sin(rpy_new[2] - rpy_last[2]), cos(rpy_new[2] - rpy_last[2])));
+			q_y_correction = q_ave_local_pose_error;
 		}
 		return succeeded_y;
 	}
@@ -881,6 +893,30 @@ tf::Quaternion PoseEstimationGaussianSphere::GetRelativeRotation(pcl::PointXYZ o
 	// std::cout << "Target: (" << Target(0) << ", " << Target(1) << ", " << Target(2) << "), depth = " << Target.norm() << std::endl;
 
 	return relative_rotation;
+}
+
+void PoseEstimationGaussianSphere::FinalEstimation(bool succeeded_rp, bool succeeded_y)
+{
+	tf::Quaternion q_pose_odom_now;
+	quaternionMsgToTF(odom_now.pose.pose.orientation, q_pose_odom_now);
+	tf::Quaternion q_pose_new = q_pose_odom_now;
+	if(succeeded_y)	q_pose_new = q_pose_new*q_y_correction;
+	if(succeeded_rp){
+		q_rp_correction = GetRelativeRotationNormals(ConvertionPoseToGVector(q_pose_new), g_vector_walls).inverse();
+		q_pose_new = q_pose_new*q_rp_correction;
+	}
+	tf::Matrix3x3(q_pose_new).getRPY(rpy_pub.data[0], rpy_pub.data[1], rpy_pub.data[2]);
+	if(!succeeded_rp){
+		rpy_pub.data[0] = NAN;
+		rpy_pub.data[1] = NAN;
+	}
+	else if(!inipose_is_available){
+		rp_sincos_calibration[0][0] += sin(rpy_pub.data[0]);
+		rp_sincos_calibration[0][1] += cos(rpy_pub.data[0]);
+		rp_sincos_calibration[1][0] += sin(rpy_pub.data[1]);
+		rp_sincos_calibration[1][1] += cos(rpy_pub.data[1]);
+	}
+	if(!succeeded_y)	rpy_pub.data[2] = NAN;
 }
 
 void PoseEstimationGaussianSphere::Visualization(void)
