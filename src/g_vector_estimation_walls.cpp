@@ -76,7 +76,8 @@ PoseEstimationGaussianSphere::PoseEstimationGaussianSphere()
 	pub_pose = nh.advertise<geometry_msgs::PoseStamped>("/pose_dgauss", 1);
 	viewer.setBackgroundColor(1, 1, 1);
 	viewer.addCoordinateSystem(0.8, "axis");
-	viewer.setCameraPosition(-5.0, -5.0, 6.0, 0.0, 0.0, 1.0);
+	viewer.setCameraPosition(-6.0, -6.0, 6.0, 0.0, 0.0, 1.0);
+	// viewer.setCameraPosition(0.0, 0.0, 40.0, 0.0, 0.0, 0.0);
 	g_vector_last.x = 0.0;
 	g_vector_last.y = 0.0;
 	g_vector_last.z = 0.0;
@@ -361,7 +362,7 @@ void PoseEstimationGaussianSphere::Visualization(void)
 	viewer.addPointCloudNormals<pcl::PointNormal>(normals, 1, 0.5, "normals");
 	viewer.setPointCloudRenderingProperties (pcl::visualization::PCL_VISUALIZER_COLOR, 0.0, 0.0, 1.0, "normals");
 	viewer.setPointCloudRenderingProperties (pcl::visualization::PCL_VISUALIZER_LINE_WIDTH, 1, "normals");
-	
+
 	viewer.addPointCloudNormals<pcl::PointNormal>(normals_extracted, 1, 0.5, "normals_extracted");
 	viewer.setPointCloudRenderingProperties (pcl::visualization::PCL_VISUALIZER_COLOR, 0.0, 1.0, 1.0, "normals_extracted");
 	viewer.setPointCloudRenderingProperties (pcl::visualization::PCL_VISUALIZER_LINE_WIDTH, 3, "normals_extracted");
@@ -377,7 +378,7 @@ void PoseEstimationGaussianSphere::Visualization(void)
 	pcl::PointCloud<pcl::PointNormal>::Ptr tmp_g_vector_walls (new pcl::PointCloud<pcl::PointNormal>);
 	tmp_g_vector_walls->points.push_back(g_vector_new);
 	viewer.addPointCloudNormals<pcl::PointNormal>(tmp_g_vector_walls, 1, 1.0, "g_vector_new");
-	viewer.setPointCloudRenderingProperties (pcl::visualization::PCL_VISUALIZER_COLOR, 0.0, 1.0, 0.0, "g_vector_new");
+	viewer.setPointCloudRenderingProperties (pcl::visualization::PCL_VISUALIZER_COLOR, 0.8, 0.8, 0.0, "g_vector_new");
 	viewer.setPointCloudRenderingProperties (pcl::visualization::PCL_VISUALIZER_LINE_WIDTH, 3, "g_vector_new");
 	
 	viewer.spinOnce();
