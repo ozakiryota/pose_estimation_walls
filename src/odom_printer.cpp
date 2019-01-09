@@ -65,6 +65,11 @@ void OdomPrinter::GetMocapTF(void)
 		q_true_cur_position = q_true_ini_pose.inverse()*q_true_cur_position*q_true_ini_pose;
 		q_true_cur_pose = q_true_ini_pose.inverse()*q_true_cur_pose;
 		mocap_is_available = true;
+
+		std::cout << "true_xyz[m]:(" << q_true_cur_position.x() << ", " << q_true_cur_position.y() << ", " << q_true_cur_position.z() << ")" << std::endl;
+		double true_cur_rpy[3];
+		tf::Matrix3x3(q_true_cur_pose).getRPY(true_cur_rpy[0], true_cur_rpy[1], true_cur_rpy[2]);
+		std::cout << "true_rpy[m]:(" << true_cur_rpy[0] << ", " << true_cur_rpy[1] << ", " << true_cur_rpy[2] << ")" << std::endl;
 	}
 	catch(tf::TransformException &ex){
 		ROS_ERROR("%s",ex.what());
