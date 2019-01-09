@@ -71,7 +71,7 @@ class PoseEstimationGaussianSphere{
 		/*flags*/
 		bool first_callback_odom = true;
 		bool inipose_is_available = false;
-		const bool mode_no_d_gauss = true;
+		const bool mode_no_d_gauss = false;
 	public:
 		PoseEstimationGaussianSphere();
 		void CallbackPC(const sensor_msgs::PointCloud2ConstPtr &msg);

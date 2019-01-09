@@ -43,15 +43,16 @@ void AverageRPY::CallbackRPY(const std_msgs::Float64MultiArrayConstPtr& msg)
 		for(int i=0;i<3;i++){
 			rpy_sincosatan[i][0] += sin(msg->data[i]);
 			rpy_sincosatan[i][1] += cos(msg->data[i]);
-			rpy_sincosatan[i][2] = atan2(rpy_sincosatan[i][0],rpy_sincosatan[i][1]);
+			rpy_sincosatan[i][2] = atan2(rpy_sincosatan[i][0], rpy_sincosatan[i][1]);
 		}
 	}
 	else{
 		std::cout << "time > " << continue_time << " s" << std::endl;
 	}
-	std::cout << "roll  = " << rpy_sincosatan[0][2]/M_PI*180 << " deg" << std::endl;
-	std::cout << "pitch = " << rpy_sincosatan[1][2]/M_PI*180 << " deg" << std::endl;
-	std::cout << "yaw   = " << rpy_sincosatan[2][2]/M_PI*180 << " deg" << std::endl;
+	std::cout << "msg : (" << msg->data[0]/M_PI*180.0 << ", " << msg->data[1]/M_PI*180.0 << ", " << msg->data[2]/M_PI*180.0 << ")[deg]" << std::endl;
+	std::cout << "roll  = " << rpy_sincosatan[0][2]/M_PI*180.0 << " deg" << std::endl;
+	std::cout << "pitch = " << rpy_sincosatan[1][2]/M_PI*180.0 << " deg" << std::endl;
+	std::cout << "yaw   = " << rpy_sincosatan[2][2]/M_PI*180.0 << " deg" << std::endl;
 	std::cout << "----------------------" << std::endl;
 
 	first_callback = false;

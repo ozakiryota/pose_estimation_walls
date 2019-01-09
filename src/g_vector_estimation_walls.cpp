@@ -348,7 +348,8 @@ tf::Quaternion PoseEstimationGaussianSphere::GetRelativeRotationNormals(pcl::Poi
 void PoseEstimationGaussianSphere::FinalEstimation(void)
 {
 	tf::Quaternion q_rp_correction = GetRelativeRotationNormals(g_vector_last, g_vector_new).inverse();
-	tf::Matrix3x3(q_pose*q_rp_correction).getRPY(rpy_pub.data[0], rpy_pub.data[1], rpy_pub.data[2]);
+	q_pose = q_pose*q_rp_correction;
+	tf::Matrix3x3(q_pose).getRPY(rpy_pub.data[0], rpy_pub.data[1], rpy_pub.data[2]);
 }
 
 void PoseEstimationGaussianSphere::Visualization(void)
