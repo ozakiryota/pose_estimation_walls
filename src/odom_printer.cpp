@@ -131,11 +131,11 @@ void OdomPrinter::Print(nav_msgs::Odometry odom)
 	for(int i=0;i<3;i++)	error_euc_dist += error_xyz[i]*error_xyz[i];
 	error_euc_dist = sqrt(error_euc_dist);
 
-	std::cout << "est xyz[m]        :(" << odom.pose.pose.position.x << ", " << odom.pose.pose.position.y << ", " << odom.pose.pose.position.z << ")" << std::endl;
-	std::cout << "error xyz[m]      :(" << error_xyz[0] << ", " << error_xyz[1] << ", " << error_xyz[2] << ")" << std::endl;
-	std::cout << "error Euc.dist.[m]:" << error_euc_dist << std::endl;
-	std::cout << "est rpy[deg]      :(" << est_cur_rpy[0]/M_PI*180.0 << ", " << est_cur_rpy[1]/M_PI*180.0 << ", " << est_cur_rpy[2]/M_PI*180.0 << ")  " << std::endl;
-	std::cout << "error rpy[deg]    :(" << error_rpy[0]/M_PI*180.0 << ", " << error_rpy[1]/M_PI*180.0 << ", " << error_rpy[2]/M_PI*180.0 << ")" << std::endl;
+	std::cout << "est xyz[m]    :(" << odom.pose.pose.position.x << ", " << odom.pose.pose.position.y << ", " << odom.pose.pose.position.z << ")" << std::endl;
+	std::cout << "error xyz[m]  :(" << error_xyz[0] << ", " << error_xyz[1] << ", " << error_xyz[2] << ")" << std::endl;
+	std::cout << "error Euc.[m] :" << error_euc_dist << std::endl;
+	std::cout << "est rpy[deg]  :(" << est_cur_rpy[0]/M_PI*180.0 << ", " << est_cur_rpy[1]/M_PI*180.0 << ", " << est_cur_rpy[2]/M_PI*180.0 << ")  " << std::endl;
+	std::cout << "error rpy[deg]:(" << error_rpy[0]/M_PI*180.0 << ", " << error_rpy[1]/M_PI*180.0 << ", " << error_rpy[2]/M_PI*180.0 << ")" << std::endl;
 }
 
 int main(int argc, char** argv)
