@@ -71,7 +71,7 @@ class PoseEstimationGaussianSphere{
 		/*flags*/
 		bool first_callback_odom = true;
 		bool inipose_is_available = false;
-		const bool mode_no_d_gauss = false;
+		const bool mode_no_d_gauss = true;
 	public:
 		PoseEstimationGaussianSphere();
 		void CallbackPC(const sensor_msgs::PointCloud2ConstPtr &msg);
@@ -135,9 +135,8 @@ void PoseEstimationGaussianSphere::CallbackPC(const sensor_msgs::PointCloud2Cons
 	if(inipose_is_available)	pcl::transformPointCloud(*cloud, *cloud, Eigen::Vector3f(0.0, 0.0, 0.0), lidar_alignment);
 	ClearPoints();
 	kdtree.setInputCloud(cloud);
-	// const int num_threads = 50;
 	const int num_threads = std::thread::hardware_concurrency();
-	std::cout << "std::thread::hardware_concurrency() = " << std::thread::hardware_concurrency() << std::endl;
+	// std::cout << "std::thread::hardware_concurrency() = " << std::thread::hardware_concurrency() << std::endl;
 	std::cout << "cloud->points.size() = " << cloud->points.size() << std::endl;
 	std::vector<std::thread> threads_fittingwalls;
 	std::vector<FittingWalls_> objects;
@@ -154,6 +153,16 @@ void PoseEstimationGaussianSphere::CallbackPC(const sensor_msgs::PointCloud2Cons
 	}
 	for(std::thread &th : threads_fittingwalls)	th.join();
 	for(int i=0;i<num_threads;i++)	objects[i].Merge(*this);
+	
+	/*test*/
+	std::cout << "gaussian_sphere->points.size() = " << gaussian_sphere->points.size() << std::endl;
+	// const size_t max_points_num = 500;
+	// if(gaussian_sphere->points.size()>max_points_num){
+	// 	pcl::PointCloud<pcl::PointXYZ>::Ptr tmp_cloud {new pcl::PointCloud<pcl::PointXYZ>};
+	// 	double sparse_step = gaussian_sphere->points.size()/(double)max_points_num;
+	// 	for(double a=0.0;a<gaussian_sphere->points.size();a+=sparse_step)	tmp_cloud->points.push_back(gaussian_sphere->points[a]);
+	// 	gaussian_sphere = tmp_cloud;
+	// }
 
 	if(!first_callback_odom){
 		bool succeeded_rp;
@@ -225,6 +234,7 @@ void PoseEstimationGaussianSphere::CallbackInipose(const geometry_msgs::Quaterni
 		inipose_is_available = true;
 		tf::Quaternion q_inipose;
 		quaternionMsgToTF(*msg, q_inipose);
+		// q_inipose = tf::Quaternion(0.0, 0.0, 0.0, 1.0);	//test
 		double r_calibration = atan2(rp_sincos_calibration[0][0], rp_sincos_calibration[0][1]);
 		double p_calibration = atan2(rp_sincos_calibration[1][0], rp_sincos_calibration[1][1]);
 		std::cout << "r_calibration = " << r_calibration << std::endl;
@@ -464,7 +474,8 @@ void PoseEstimationGaussianSphere::ClusterGauss(void)
 {
 	// std::cout << "POINT CLUSTER" << std::endl;
 	const double cluster_distance = 0.1;
-	const int min_num_cluster_belongings = 70;
+	// const int min_num_cluster_belongings = 70;
+	const int min_num_cluster_belongings = 50;
 	pcl::search::KdTree<pcl::PointXYZ>::Ptr tree (new pcl::search::KdTree<pcl::PointXYZ>);
 	tree->setInputCloud(gaussian_sphere);
 	std::vector<pcl::PointIndices> cluster_indices;
@@ -917,6 +928,7 @@ void PoseEstimationGaussianSphere::FinalEstimation(bool succeeded_rp, bool succe
 		rp_sincos_calibration[1][1] += cos(rpy_pub.data[1]);
 	}
 	if(!succeeded_y)	rpy_pub.data[2] = NAN;
+	// if(!succeeded_y && !succeeded_rp)	rpy_pub.data[2] = NAN;
 }
 
 void PoseEstimationGaussianSphere::Visualization(void)

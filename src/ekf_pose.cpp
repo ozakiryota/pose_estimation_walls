@@ -200,9 +200,12 @@ void EKFPose::ObservationSLAM(void)
 	Eigen::MatrixXd R(num_obs, num_obs);
 	const double sigma = 5.0e+5;
 	R = sigma*Eigen::MatrixXd::Identity(num_obs, num_obs);
-	R <<	5.0e+2,	0, 0,
-	  		0,	5.0e+2,	0,
-			0,	0,	1.0e-2;
+	// R <<	5.0e+2,	0, 0,
+	//   		0,	5.0e+2,	0,
+	// 		0,	0,	1.0e-2;
+	R <<	1.0e+5,	0, 0,
+	  		0,	1.0e+5,	0,
+			0,	0,	1.0e+1;
 	Eigen::MatrixXd Y(num_obs, 1);
 	Eigen::MatrixXd S(num_obs, num_obs);
 	Eigen::MatrixXd K(num_state, num_obs);
@@ -318,7 +321,7 @@ void EKFPose::CallbackRPYWalls(const std_msgs::Float64MultiArrayConstPtr& msg)
 		Eigen::MatrixXd H = Eigen::MatrixXd::Identity(num_obs, num_state);
 		Eigen::MatrixXd jH = H;
 		// const double sigma = 1.0e-0;
-		const double sigma = 1.0e-0;
+		const double sigma = 1.0e+0;
 		Eigen::MatrixXd R = sigma*Eigen::MatrixXd::Identity(num_obs, num_obs);
 		// Eigen::MatrixXd R(num_obs, num_obs);
 		// R <<	1.0e+2,	0.0,	0.0,

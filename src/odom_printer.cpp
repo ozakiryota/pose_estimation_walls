@@ -19,7 +19,7 @@ class OdomPrinter{
 		tf::Quaternion q_true_ini_pose;
 		tf::Quaternion q_true_cur_position;
 		tf::Quaternion q_true_cur_pose;
-		double est_ini_rpy[3] = {};
+		tf::Quaternion q_est_ini_pose = {0.0, 0.0, 0.0, 1.0};
 		/*flags*/
 		bool mocap_is_available = false;
 	public:
@@ -35,7 +35,7 @@ class OdomPrinter{
 
 OdomPrinter::OdomPrinter()
 {
-	sub_inipose = nh.subscribe("/initial_pose", 1, &OdomPrinter::CallbackOdom1, this);
+	sub_inipose = nh.subscribe("/initial_pose", 1, &OdomPrinter::CallbackInipose, this);
 	sub_odom1 = nh.subscribe("/combined_odometry", 1, &OdomPrinter::CallbackOdom1, this);
 	sub_odom2 = nh.subscribe("/gyrodometry", 1, &OdomPrinter::CallbackOdom2, this);
 	sub_odom3 = nh.subscribe("/loamvelodyne_odometry", 1, &OdomPrinter::CallbackOdom3, this);
@@ -46,12 +46,14 @@ void OdomPrinter::GetMocapTF(void)
 {
 	tf::StampedTransform transform;
 	try{
-		listener.lookupTransform("/vicon/infant/infant", "/world", ros::Time(0), transform);
+		// listener.lookupTransform("/vicon/infant/infant", "/world", ros::Time(0), transform);
+		listener.lookupTransform("/world", "/vicon/infant/infant", ros::Time(0), transform);
 		q_true_cur_position = tf::Quaternion(
-				transform.getOrigin().x(),
-				transform.getOrigin().y(),
-				transform.getOrigin().z(),
-				0.0);
+			transform.getOrigin().x(),
+			transform.getOrigin().y(),
+			transform.getOrigin().z(),
+			0.0);
+		std::cout << "test:(" << q_true_cur_position.x() << ", " << q_true_cur_position.y() << ", " << q_true_cur_position.z() << ")" << std::endl;
 		q_true_cur_pose = transform.getRotation();
 		if(!mocap_is_available){
 			q_true_ini_position = q_true_cur_position;
@@ -66,10 +68,10 @@ void OdomPrinter::GetMocapTF(void)
 		q_true_cur_pose = q_true_ini_pose.inverse()*q_true_cur_pose;
 		mocap_is_available = true;
 
-		std::cout << "true_xyz[m]:(" << q_true_cur_position.x() << ", " << q_true_cur_position.y() << ", " << q_true_cur_position.z() << ")" << std::endl;
 		double true_cur_rpy[3];
 		tf::Matrix3x3(q_true_cur_pose).getRPY(true_cur_rpy[0], true_cur_rpy[1], true_cur_rpy[2]);
-		std::cout << "true_rpy[m]:(" << true_cur_rpy[0] << ", " << true_cur_rpy[1] << ", " << true_cur_rpy[2] << ")" << std::endl;
+		std::cout << "true xyz[m]:(" << q_true_cur_position.x() << ", " << q_true_cur_position.y() << ", " << q_true_cur_position.z() << ")" << std::endl;
+		std::cout << "true rpy[m]:(" << true_cur_rpy[0]/M_PI*180.0 << ", " << true_cur_rpy[1]/M_PI*180.0 << ", " << true_cur_rpy[2]/M_PI*180.0 << ")" << std::endl;
 	}
 	catch(tf::TransformException &ex){
 		ROS_ERROR("%s",ex.what());
@@ -79,9 +81,7 @@ void OdomPrinter::GetMocapTF(void)
 
 void OdomPrinter::CallbackInipose(const geometry_msgs::QuaternionConstPtr& msg)
 {
-	tf::Quaternion q_est_ini_pose;
 	quaternionMsgToTF(*msg, q_est_ini_pose);
-	tf::Matrix3x3(q_est_ini_pose).getRPY(est_ini_rpy[0], est_ini_rpy[1], est_ini_rpy[2]);
 }
 
 void OdomPrinter::CallbackOdom1(const nav_msgs::OdometryConstPtr& msg)
@@ -113,6 +113,10 @@ void OdomPrinter::Print(nav_msgs::Odometry odom)
 
 	double error_xyz[3];
 	double error_rpy[3];
+	double est_cur_relative_rpy[3];
+	tf::Matrix3x3(q_est_ini_pose.inverse()*q_est_cur_pose).getRPY(est_cur_relative_rpy[0], est_cur_relative_rpy[1], est_cur_relative_rpy[2]);
+	double est_ini_rpy[3];
+	tf::Matrix3x3(q_est_ini_pose).getRPY(est_ini_rpy[0], est_ini_rpy[1], est_ini_rpy[2]);
 
 	std::cout << "--- " << odom.child_frame_id << "  ---" << std::endl;
 	if(mocap_is_available){
@@ -121,16 +125,17 @@ void OdomPrinter::Print(nav_msgs::Odometry odom)
 		error_xyz[0] = odom.pose.pose.position.x - q_true_cur_position.x();
 		error_xyz[1] = odom.pose.pose.position.y - q_true_cur_position.y();
 		error_xyz[2] = odom.pose.pose.position.z - q_true_cur_position.z();
-		for(int i=0;i<3;i++)	error_rpy[i] = est_cur_rpy[i] - true_cur_rpy[i];
+		for(int i=0;i<3;i++)	error_rpy[i] = atan2(sin(est_cur_rpy[i] - true_cur_rpy[i]), cos(est_cur_rpy[i] - true_cur_rpy[i]));
 
-		std::cout << "true_position[m]: (" << q_true_cur_position.x() << ", " << q_true_cur_position.y() << ", " << q_true_cur_position.z() << ")" << std::endl;
-		std::cout << "true_pose[m]: (" << true_cur_rpy[0] << ", " << true_cur_rpy[1] << ", " << true_cur_rpy[2] << ")" << std::endl;
+		// std::cout << "true_position[m]: (" << q_true_cur_position.x() << ", " << q_true_cur_position.y() << ", " << q_true_cur_position.z() << ")" << std::endl;
+		// std::cout << "true_pose[m]: (" << true_cur_rpy[0] << ", " << true_cur_rpy[1] << ", " << true_cur_rpy[2] << ")" << std::endl;
 	}
 	else{
 		error_xyz[0] = odom.pose.pose.position.x;
 		error_xyz[1] = odom.pose.pose.position.y;
 		error_xyz[2] = odom.pose.pose.position.z;
-		for(int i=0;i<3;i++)	error_rpy[i] = est_cur_rpy[i] - est_ini_rpy[i];
+		// for(int i=0;i<3;i++)	error_rpy[i] = atan2(sin(est_cur_rpy[i] - est_ini_rpy[i]), cos(est_cur_rpy[i] - est_ini_rpy[i]));
+		for(int i=0;i<3;i++)	error_rpy[i] = est_cur_relative_rpy[i];
 	}
 	double error_euc_dist = 0.0;
 	for(int i=0;i<3;i++)	error_euc_dist += error_xyz[i]*error_xyz[i];
