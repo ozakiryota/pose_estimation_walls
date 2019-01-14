@@ -60,7 +60,7 @@ EKFPose::EKFPose()
 	sub_bias = nh.subscribe("/imu_bias", 1, &EKFPose::CallbackBias, this);
 	sub_imu = nh.subscribe("/imu/data", 1, &EKFPose::CallbackIMU, this);
 	sub_slam = nh.subscribe("/lsd_slam/pose", 1, &EKFPose::CallbackSLAM, this);
-	sub_rpy_walls = nh.subscribe("/rpy_walls", 1, &EKFPose::CallbackRPYWalls, this);
+	sub_rpy_walls = nh.subscribe("/rpy_cov_walls", 1, &EKFPose::CallbackRPYWalls, this);
 	pub = nh.advertise<geometry_msgs::PoseStamped>("/pose_ekf", 1);
 	q_pose = tf::Quaternion(0.0, 0.0, 0.0, 1.0);
 	X = Eigen::MatrixXd::Constant(num_state, 1, 0.0);
@@ -321,7 +321,7 @@ void EKFPose::CallbackRPYWalls(const std_msgs::Float64MultiArrayConstPtr& msg)
 		Eigen::MatrixXd H = Eigen::MatrixXd::Identity(num_obs, num_state);
 		Eigen::MatrixXd jH = H;
 		// const double sigma = 1.0e-0;
-		const double sigma = 1.0e+0;
+		const double sigma = msg->data[3];
 		Eigen::MatrixXd R = sigma*Eigen::MatrixXd::Identity(num_obs, num_obs);
 		// Eigen::MatrixXd R(num_obs, num_obs);
 		// R <<	1.0e+2,	0.0,	0.0,

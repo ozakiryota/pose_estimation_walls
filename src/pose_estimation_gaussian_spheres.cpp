@@ -62,7 +62,7 @@ class PoseEstimationGaussianSphere{
 		std::vector<size_t> list_num_dgauss_cluster_belongings;
 		nav_msgs::Odometry odom_now;
 		geometry_msgs::PoseStamped pose_pub;
-		std_msgs::Float64MultiArray rpy_pub;
+		std_msgs::Float64MultiArray rpy_cov_pub;
 		double rp_sincos_calibration[2][2] = {};
 		Eigen::Quaternionf lidar_alignment{1.0, 0.0, 0.0, 0.0};
 		ros::Time time_pub;
@@ -115,7 +115,7 @@ PoseEstimationGaussianSphere::PoseEstimationGaussianSphere()
 	sub_pc = nh.subscribe("/velodyne_points", 1, &PoseEstimationGaussianSphere::CallbackPC, this);
 	sub_odom = nh.subscribe("/combined_odometry", 1, &PoseEstimationGaussianSphere::CallbackOdom, this);
 	sub_inipose = nh.subscribe("/initial_pose", 1, &PoseEstimationGaussianSphere::CallbackInipose, this);
-	pub_rpy = nh.advertise<std_msgs::Float64MultiArray>("/rpy_walls", 1);
+	pub_rpy = nh.advertise<std_msgs::Float64MultiArray>("/rpy_cov_walls", 1);
 	pub_pose = nh.advertise<geometry_msgs::PoseStamped>("/pose_dgauss", 1);
 	viewer.setBackgroundColor(1, 1, 1);
 	viewer.addCoordinateSystem(0.8, "axis");
@@ -124,7 +124,7 @@ PoseEstimationGaussianSphere::PoseEstimationGaussianSphere()
 	g_vector_from_ekf.y = 0.0;
 	g_vector_from_ekf.z = 0.0;
 	g_vector_walls = g_vector_from_ekf;
-	rpy_pub.data.resize(3);
+	rpy_cov_pub.data.resize(4);
 }
 
 void PoseEstimationGaussianSphere::CallbackPC(const sensor_msgs::PointCloud2ConstPtr &msg)
@@ -185,18 +185,18 @@ void PoseEstimationGaussianSphere::CallbackPC(const sensor_msgs::PointCloud2Cons
 		// if(succeeded_rp)	q_pose_new = q_pose_new*q_rp_correction;
 		// // if(succeeded_y)	q_pose_new = q_y_correction*q_pose_new;
 		// if(succeeded_y)	q_pose_new = q_pose_new*q_y_correction;
-		// tf::Matrix3x3(q_pose_new).getRPY(rpy_pub.data[0], rpy_pub.data[1], rpy_pub.data[2]);
+		// tf::Matrix3x3(q_pose_new).getRPY(rpy_cov_pub.data[0], rpy_cov_pub.data[1], rpy_cov_pub.data[2]);
 		// if(!succeeded_rp){
-		// 	rpy_pub.data[0] = NAN;
-		// 	rpy_pub.data[1] = NAN;
+		// 	rpy_cov_pub.data[0] = NAN;
+		// 	rpy_cov_pub.data[1] = NAN;
 		// }
 		// else if(!inipose_is_available){
-		// 	rp_sincos_calibration[0][0] += sin(rpy_pub.data[0]);
-		// 	rp_sincos_calibration[0][1] += cos(rpy_pub.data[0]);
-		// 	rp_sincos_calibration[1][0] += sin(rpy_pub.data[1]);
-		// 	rp_sincos_calibration[1][1] += cos(rpy_pub.data[1]);
+		// 	rp_sincos_calibration[0][0] += sin(rpy_cov_pub.data[0]);
+		// 	rp_sincos_calibration[0][1] += cos(rpy_cov_pub.data[0]);
+		// 	rp_sincos_calibration[1][0] += sin(rpy_cov_pub.data[1]);
+		// 	rp_sincos_calibration[1][1] += cos(rpy_cov_pub.data[1]);
 		// }
-		// if(!succeeded_y)	rpy_pub.data[2] = NAN;
+		// if(!succeeded_y)	rpy_cov_pub.data[2] = NAN;
 
 		if(succeeded_rp || succeeded_y){
 			FinalEstimation(succeeded_rp, succeeded_y);
@@ -534,6 +534,7 @@ bool PoseEstimationGaussianSphere::GVectorEstimation(void)
 	else if(gaussian_sphere_clustered->points.size()==1){
 		// std::cout << ">> 1 normal" << std::endl;
 		PartialRotation();
+		rpy_cov_pub.data[3] = 5.0e+0;
 	}
 	else if(gaussian_sphere_clustered->points.size()==2){
 		// std::cout << ">> 2 normals" << std::endl;
@@ -541,6 +542,7 @@ bool PoseEstimationGaussianSphere::GVectorEstimation(void)
 		g_vector_walls.normal_x = gaussian_sphere_clustered->points[0].y*gaussian_sphere_clustered->points[1].z - gaussian_sphere_clustered->points[0].z*gaussian_sphere_clustered->points[1].y;
 		g_vector_walls.normal_y = gaussian_sphere_clustered->points[0].z*gaussian_sphere_clustered->points[1].x - gaussian_sphere_clustered->points[0].x*gaussian_sphere_clustered->points[1].z;
 		g_vector_walls.normal_z = gaussian_sphere_clustered->points[0].x*gaussian_sphere_clustered->points[1].y - gaussian_sphere_clustered->points[0].y*gaussian_sphere_clustered->points[1].x;
+		rpy_cov_pub.data[3] = 1.0e+0;
 	}
 	else if(gaussian_sphere_clustered->points.size()>2){
 		// std::cout << ">> more than 3 normals" << std::endl;
@@ -550,6 +552,7 @@ bool PoseEstimationGaussianSphere::GVectorEstimation(void)
 		g_vector_walls.normal_x = plane_parameters[0];
 		g_vector_walls.normal_y = plane_parameters[1];
 		g_vector_walls.normal_z = plane_parameters[2];
+		rpy_cov_pub.data[3] = 1.0e+0;
 	}
 	/*flip*/
 	flipNormalTowardsViewpoint(g_vector_walls, 0.0, 0.0, -100.0, g_vector_walls.normal_x, g_vector_walls.normal_y, g_vector_walls.normal_z);
@@ -565,8 +568,8 @@ bool PoseEstimationGaussianSphere::GVectorEstimation(void)
 	// g_vector_walls.normal_y /= norm_g;
 	// g_vector_walls.normal_z /= norm_g;
 	// #<{(|convertion to roll, pitch|)}>#
-	// rpy_pub.data[0] = atan2(-g_vector_walls.normal_y, -g_vector_walls.normal_z);
-	// rpy_pub.data[1] = atan2(g_vector_walls.normal_x, sqrt(-g_vector_walls.normal_y*-g_vector_walls.normal_y + -g_vector_walls.normal_z*-g_vector_walls.normal_z));
+	// rpy_cov_pub.data[0] = atan2(-g_vector_walls.normal_y, -g_vector_walls.normal_z);
+	// rpy_cov_pub.data[1] = atan2(g_vector_walls.normal_x, sqrt(-g_vector_walls.normal_y*-g_vector_walls.normal_y + -g_vector_walls.normal_z*-g_vector_walls.normal_z));
 	
 	// q_rp_correction = GetRelativeRotationNormals(g_vector_from_ekf, g_vector_walls).inverse();
 
@@ -916,19 +919,19 @@ void PoseEstimationGaussianSphere::FinalEstimation(bool succeeded_rp, bool succe
 		q_rp_correction = GetRelativeRotationNormals(ConvertionPoseToGVector(q_pose_new), g_vector_walls).inverse();
 		q_pose_new = q_pose_new*q_rp_correction;
 	}
-	tf::Matrix3x3(q_pose_new).getRPY(rpy_pub.data[0], rpy_pub.data[1], rpy_pub.data[2]);
+	tf::Matrix3x3(q_pose_new).getRPY(rpy_cov_pub.data[0], rpy_cov_pub.data[1], rpy_cov_pub.data[2]);
 	if(!succeeded_rp){
-		rpy_pub.data[0] = NAN;
-		rpy_pub.data[1] = NAN;
+		rpy_cov_pub.data[0] = NAN;
+		rpy_cov_pub.data[1] = NAN;
 	}
 	else if(!inipose_is_available){
-		rp_sincos_calibration[0][0] += sin(rpy_pub.data[0]);
-		rp_sincos_calibration[0][1] += cos(rpy_pub.data[0]);
-		rp_sincos_calibration[1][0] += sin(rpy_pub.data[1]);
-		rp_sincos_calibration[1][1] += cos(rpy_pub.data[1]);
+		rp_sincos_calibration[0][0] += sin(rpy_cov_pub.data[0]);
+		rp_sincos_calibration[0][1] += cos(rpy_cov_pub.data[0]);
+		rp_sincos_calibration[1][0] += sin(rpy_cov_pub.data[1]);
+		rp_sincos_calibration[1][1] += cos(rpy_cov_pub.data[1]);
 	}
-	if(!succeeded_y)	rpy_pub.data[2] = NAN;
-	// if(!succeeded_y && !succeeded_rp)	rpy_pub.data[2] = NAN;
+	if(!succeeded_y)	rpy_cov_pub.data[2] = NAN;
+	// if(!succeeded_y && !succeeded_rp)	rpy_cov_pub.data[2] = NAN;
 }
 
 void PoseEstimationGaussianSphere::Visualization(void)
@@ -982,7 +985,7 @@ void PoseEstimationGaussianSphere::Visualization(void)
 
 void PoseEstimationGaussianSphere::Publication(void)
 {
-	pub_rpy.publish(rpy_pub);
+	pub_rpy.publish(rpy_cov_pub);
 
 	pose_pub.header.frame_id = odom_now.header.frame_id;
 	pose_pub.header.stamp = time_pub;
