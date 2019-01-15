@@ -67,7 +67,7 @@ void OdomPrinter::Print(nav_msgs::Odometry odom)
 		odom.pose.pose.position.y,
 		odom.pose.pose.position.z,
 		0.0);
-	tf::Quaternion q_relative_position = q_ini_pose.inverse()*q_relative_position*q_ini_pose;
+	tf::Quaternion q_relative_position = q_ini_pose.inverse()*q_raw_position*q_ini_pose;
 
 	double raw_rpy[3];
 	tf::Quaternion q_raw_pose;
