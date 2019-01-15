@@ -156,13 +156,39 @@ void PoseEstimationGaussianSphere::CallbackPC(const sensor_msgs::PointCloud2Cons
 	
 	/*test*/
 	std::cout << "gaussian_sphere->points.size() = " << gaussian_sphere->points.size() << std::endl;
-	// const size_t max_points_num = 500;
-	// if(gaussian_sphere->points.size()>max_points_num){
-	// 	pcl::PointCloud<pcl::PointXYZ>::Ptr tmp_cloud {new pcl::PointCloud<pcl::PointXYZ>};
-	// 	double sparse_step = gaussian_sphere->points.size()/(double)max_points_num;
-	// 	for(double a=0.0;a<gaussian_sphere->points.size();a+=sparse_step)	tmp_cloud->points.push_back(gaussian_sphere->points[a]);
-	// 	gaussian_sphere = tmp_cloud;
-	// }
+	const size_t max_points_num = 800;
+	if(gaussian_sphere->points.size()>max_points_num){
+		// double sparse_step = gaussian_sphere->points.size()/(double)max_points_num;
+		// pcl::PointCloud<pcl::PointXYZ>::Ptr tmp_cloud {new pcl::PointCloud<pcl::PointXYZ>};
+		// for(double a=0.0;a<gaussian_sphere->points.size();a+=sparse_step)	tmp_cloud->points.push_back(gaussian_sphere->points[a]);
+		// gaussian_sphere = tmp_cloud;
+
+		// class DecimatingPoints{
+		// 	private:
+		// 	public:
+		// 		pcl::PointCloud<pcl::PointXYZ>::Ptr pc_decimated {new pcl::PointCloud<pcl::PointXYZ>};
+		// 		void PushBack(pcl::PointCloud<pcl::PointXYZ> pc, int start, int end, double step){
+		// 			for(double k=start;k<end;k+=step)	pc_decimated->points.push_back(pc.points[k]);
+		// 		};
+		// };
+		// std::vector<DecimatingPoints> decimating_objects;
+		// for(int i=0;i<num_threads;i++){
+		// 	DecimatingPoints tmp_decimating_object;
+		// 	decimating_objects.push_back(tmp_decimating_object);
+		// }
+		// std::vector<std::thread> decimating_threads;
+		// for(int i=0;i<num_threads;i++){
+		// 	decimating_threads.push_back(
+		// 		std::thread([i, num_threads, &decimating_objects, this, sparse_step]{
+		// 			decimating_objects[i].PushBack(*gaussian_sphere, i*gaussian_sphere->points.size()/num_threads, (i+1)*gaussian_sphere->points.size()/num_threads, sparse_step);
+		// 		})
+		// 	);
+		// }
+		// for(std::thread &th : decimating_threads)	th.join();
+		// gaussian_sphere->points.clear();
+		// for(int i=0;i<num_threads;i++)	*gaussian_sphere += *decimating_objects[i].pc_decimated;
+		// std::cout << "gaussian_sphere->points.size() = " << gaussian_sphere->points.size() << std::endl;
+	}
 
 	if(!first_callback_odom){
 		bool succeeded_rp;
@@ -177,26 +203,6 @@ void PoseEstimationGaussianSphere::CallbackPC(const sensor_msgs::PointCloud2Cons
 			succeeded_y = MatchWalls();
 		}
 		thread_rp.join();
-
-		// tf::Quaternion q_pose_odom_now;
-		// quaternionMsgToTF(odom_now.pose.pose.orientation, q_pose_odom_now);
-		// tf::Quaternion q_pose_new = q_pose_odom_now;
-		// succeeded_rp = false;
-		// if(succeeded_rp)	q_pose_new = q_pose_new*q_rp_correction;
-		// // if(succeeded_y)	q_pose_new = q_y_correction*q_pose_new;
-		// if(succeeded_y)	q_pose_new = q_pose_new*q_y_correction;
-		// tf::Matrix3x3(q_pose_new).getRPY(rpy_cov_pub.data[0], rpy_cov_pub.data[1], rpy_cov_pub.data[2]);
-		// if(!succeeded_rp){
-		// 	rpy_cov_pub.data[0] = NAN;
-		// 	rpy_cov_pub.data[1] = NAN;
-		// }
-		// else if(!inipose_is_available){
-		// 	rp_sincos_calibration[0][0] += sin(rpy_cov_pub.data[0]);
-		// 	rp_sincos_calibration[0][1] += cos(rpy_cov_pub.data[0]);
-		// 	rp_sincos_calibration[1][0] += sin(rpy_cov_pub.data[1]);
-		// 	rp_sincos_calibration[1][1] += cos(rpy_cov_pub.data[1]);
-		// }
-		// if(!succeeded_y)	rpy_cov_pub.data[2] = NAN;
 
 		if(succeeded_rp || succeeded_y){
 			FinalEstimation(succeeded_rp, succeeded_y);
@@ -262,86 +268,6 @@ void PoseEstimationGaussianSphere::ClearPoints(void)
 	list_num_dgauss_cluster_belongings.clear();
 }
 
-// void PoseEstimationGaussianSphere::FittingWalls(void)
-// {
-// 	// std::cout << "NORMAL ESTIMATION" << std::endl;
-//
-// 	kdtree.setInputCloud(cloud);
-// 	const size_t skip_step = 3;
-// 	// const size_t skip_step = 7;
-// 	for(size_t i=0;i<cloud->points.size()/2;i+=skip_step){
-// 		bool input_to_gauss = true;
-// 		bool input_to_dgauss = true;
-// 		#<{(|search neighbor points|)}>#
-// 		std::vector<int> indices;
-// 		double laser_distance = sqrt(cloud->points[i].x*cloud->points[i].x + cloud->points[i].y*cloud->points[i].y + cloud->points[i].z*cloud->points[i].z);
-// 		const double search_radius_min = 0.3;
-// 		const double ratio = 0.09;
-// 		double search_radius = ratio*laser_distance;
-// 		if(search_radius<search_radius_min)	search_radius = search_radius_min;
-// 		indices = KdtreeSearch(cloud->points[i], search_radius);
-// 		#<{(|judge|)}>#
-// 		// const size_t threshold_num_neighborpoints_gauss = 20;
-// 		// const size_t threshold_num_neighborpoints_dgauss = 5;
-// 		const size_t threshold_num_neighborpoints_gauss = 20;
-// 		const size_t threshold_num_neighborpoints_dgauss = 5;
-// 		if(indices.size()<threshold_num_neighborpoints_gauss)	input_to_gauss = false;
-// 		if(indices.size()<threshold_num_neighborpoints_dgauss)	input_to_dgauss = false;
-// 		if(!input_to_gauss && !input_to_dgauss)	continue;
-// 		#<{(|compute normal|)}>#
-// 		float curvature;
-// 		Eigen::Vector4f plane_parameters;
-// 		pcl::computePointNormal(*cloud, indices, plane_parameters, curvature);
-// 		#<{(|create tmp object|)}>#
-// 		pcl::PointNormal tmp_normal;
-// 		tmp_normal.x = cloud->points[i].x;
-// 		tmp_normal.y = cloud->points[i].y;
-// 		tmp_normal.z = cloud->points[i].z;
-// 		tmp_normal.normal_x = plane_parameters[0];
-// 		tmp_normal.normal_y = plane_parameters[1];
-// 		tmp_normal.normal_z = plane_parameters[2];
-// 		tmp_normal.curvature = curvature;
-// 		flipNormalTowardsViewpoint(tmp_normal, 0.0, 0.0, 0.0, tmp_normal.normal_x, tmp_normal.normal_y, tmp_normal.normal_z);
-// 		normals->points.push_back(tmp_normal);
-// 		#<{(|delete nan|)}>#
-// 		if(std::isnan(plane_parameters[0]) || std::isnan(plane_parameters[1]) || std::isnan(plane_parameters[2])){
-// 			input_to_gauss = false;
-// 			input_to_dgauss = false;
-// 			continue;
-// 		}
-// 		#<{(|judge|)}>#
-// 		const double threshold_angle = 30.0;	//[deg]
-// 		if(fabs(fabs(AngleBetweenVectors(tmp_normal, g_vector_from_ekf))-M_PI/2.0)>threshold_angle/180.0*M_PI){
-// 			input_to_gauss = false;
-// 			input_to_dgauss = false;
-// 			continue;
-// 		}
-// 		#<{(|judge|)}>#
-// 		const double threshold_fitting_error = 0.01;	//[m]
-// 		if(ComputeSquareError(plane_parameters, indices)>threshold_fitting_error){
-// 			input_to_gauss = false;
-// 			input_to_dgauss = false;
-// 			continue;
-// 		}
-// 		#<{(|input|)}>#
-// 		normals_extracted->points.push_back(tmp_normal);
-// 		#<{(|unit gaussian sphere|)}>#
-// 		pcl::PointXYZ tmp_point;
-// 		if(input_to_gauss){
-// 			tmp_point.x = plane_parameters[0];
-// 			tmp_point.y = plane_parameters[1];
-// 			tmp_point.z = plane_parameters[2];
-// 			gaussian_sphere->points.push_back(tmp_point);
-// 		}
-// 		#<{(|d-gaussian sphere|)}>#
-// 		if(input_to_dgauss){
-// 			tmp_point.x = -plane_parameters[3]*plane_parameters[0];
-// 			tmp_point.y = -plane_parameters[3]*plane_parameters[1];
-// 			tmp_point.z = -plane_parameters[3]*plane_parameters[2];
-// 			d_gaussian_sphere->points.push_back(tmp_point);
-// 		}
-// 	}
-// }
 void PoseEstimationGaussianSphere::FittingWalls_::Compute(PoseEstimationGaussianSphere &mainclass, size_t i_start, size_t i_end)
 {
 	// std::cout << "NORMAL ESTIMATION" << std::endl;
