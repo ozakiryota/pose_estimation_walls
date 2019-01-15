@@ -11,7 +11,7 @@
 	<!-- <node pkg="rosbag" type="play" name="player_vicon" args="&#45;&#45;clock /home/amsl/ozaki/bagfiles/infant_mocap/2018&#45;12&#45;09&#45;14&#45;40&#45;09_.bag &#45;s 0"/> -->
 
 	<!-- rviz -->
-	<node pkg="rviz" type="rviz" name="rviz_startpoint" args="-d /home/amsl/.rviz/trajectories_startpoint.rviz"/>
+	<!-- <node pkg="rviz" type="rviz" name="rviz_startpoint" args="&#45;d /home/amsl/.rviz/trajectories_startpoint.rviz"/> -->
 	<!-- <node pkg="rviz" type="rviz" name="rviz_skyview" args="&#45;d /home/amsl/.rviz/trajectories_skyview.rviz"/> -->
 	<!-- <node pkg="rviz" type="rviz" name="rviz_skyview" args="&#45;d /home/amsl/.rviz/vicon.rviz"/> -->
 

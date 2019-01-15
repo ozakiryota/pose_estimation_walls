@@ -227,7 +227,7 @@ void EKFPose::ObservationSLAM(void)
 	}
 
 	count_slam++;
-	if(count_slam%500==0){
+	if(count_slam%50==0){
 		std::cout << count_slam << ": CALLBACK SLAM" << std::endl;
 		std::cout << "Y = " << std::endl << Y << std::endl;
 		std::cout << "K*Y = " << std::endl << K*Y << std::endl;
