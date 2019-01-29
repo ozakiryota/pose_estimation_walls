@@ -67,6 +67,7 @@ void OdomRepublishINFANT::CallbackOdom(const nav_msgs::OdometryConstPtr& msg)
 	odom.pose.pose.position.z = 0.0;
 	
     odom.header.stamp = msg->header.stamp;
+	odom.twist = msg->twist;
     pub.publish(odom);
 
     first_callback_odom = false;

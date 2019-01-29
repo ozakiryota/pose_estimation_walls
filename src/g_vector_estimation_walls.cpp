@@ -76,8 +76,9 @@ PoseEstimationGaussianSphere::PoseEstimationGaussianSphere()
 	pub_pose = nh.advertise<geometry_msgs::PoseStamped>("/pose_dgauss", 1);
 	viewer.setBackgroundColor(1, 1, 1);
 	viewer.addCoordinateSystem(0.8, "axis");
-	viewer.setCameraPosition(-6.0, -6.0, 6.0, 0.0, 0.0, 1.0);
+	// viewer.setCameraPosition(-6.0, -6.0, 6.0, 0.0, 0.0, 1.0);
 	// viewer.setCameraPosition(0.0, 0.0, 40.0, 0.0, 0.0, 0.0);
+	viewer.setCameraPosition(35.0, -15.0, 25.0, 0.0, 0.0, 1.0);
 	g_vector_last.x = 0.0;
 	g_vector_last.y = 0.0;
 	g_vector_last.z = 0.0;
@@ -359,7 +360,7 @@ void PoseEstimationGaussianSphere::Visualization(void)
 	viewer.addPointCloud(cloud, "cloud");
 	viewer.setPointCloudRenderingProperties (pcl::visualization::PCL_VISUALIZER_COLOR, 0.0, 0.0, 0.0, "cloud");
 	viewer.setPointCloudRenderingProperties (pcl::visualization::PCL_VISUALIZER_POINT_SIZE, 3, "cloud");
-	
+
 	viewer.addPointCloudNormals<pcl::PointNormal>(normals, 1, 0.5, "normals");
 	viewer.setPointCloudRenderingProperties (pcl::visualization::PCL_VISUALIZER_COLOR, 0.0, 0.0, 1.0, "normals");
 	viewer.setPointCloudRenderingProperties (pcl::visualization::PCL_VISUALIZER_LINE_WIDTH, 1, "normals");

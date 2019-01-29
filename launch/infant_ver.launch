@@ -3,12 +3,9 @@
 	<param name="use_sim_time" value="true"/>
 
 	<!-- rosbag -->
-	<!-- <node pkg="rosbag" type="play" name="player" args="&#45;&#45;clock /home/amsl/ozaki/bagfiles/infant/2018&#45;12&#45;12&#45;18&#45;38&#45;39.bag &#45;s 50"/> -->
-	<node pkg="rosbag" type="play" name="player" args="--clock /home/amsl/ozaki//bagfiles/mocap/0113_infant/2019-01-13-18-50-27.bag -s 0"/>
-
-	<!-- rosbag with mocap -->
-	<!-- <node pkg="rosbag" type="play" name="player_infant" args="&#45;&#45;clock /home/amsl/ozaki/bagfiles/infant_mocap/2018&#45;12&#45;09&#45;14&#45;40&#45;09.bag &#45;s 0"/> -->
-	<!-- <node pkg="rosbag" type="play" name="player_vicon" args="&#45;&#45;clock /home/amsl/ozaki/bagfiles/infant_mocap/2018&#45;12&#45;09&#45;14&#45;40&#45;09_.bag &#45;s 0"/> -->
+	<node pkg="rosbag" type="play" name="player" args="--clock /home/amsl/ozaki/bagfiles/infant/2018-12-12-18-38-39.bag -s 50"/>
+	<!-- <node pkg="rosbag" type="play" name="player" args="&#45;&#45;clock /home/amsl/ozaki//bagfiles/mocap/0113_infant/2019&#45;01&#45;13&#45;18&#45;50&#45;27.bag &#45;s 0"/> -->
+	<!-- <node pkg="rosbag" type="play" name="player" args="&#45;&#45;clock /home/amsl/ozaki//bagfiles/mocap/0119_infant/2019&#45;01&#45;19&#45;18&#45;26&#45;15.bag &#45;s 0"/> -->
 
 	<!-- rviz -->
 	<!-- <node pkg="rviz" type="rviz" name="rviz_startpoint" args="&#45;d /home/amsl/.rviz/trajectories_startpoint.rviz"/> -->
@@ -17,10 +14,10 @@
 
 	<!-- sensor driver -->
 	<include file="$(find velodyne_pointcloud)/launch/32e_points.launch"/>
-	<node pkg="image_transport" type="republish" name="republish" args="compressed raw">
-		<remap from="in" to="/camera/color/image_raw"/>
-		<remap from="out" to="/camera/color/image_raw"/>
-	</node>
+	<!-- <node pkg="image_transport" type="republish" name="republish" args="compressed raw"> -->
+	<!-- 	<remap from="in" to="/camera/color/image_raw"/> -->
+	<!-- 	<remap from="out" to="/camera/color/image_raw"/> -->
+	<!-- </node> -->
 
 	<!-- proposed method -->
 	<node pkg="pose_estimation_walls" name="odom_republish_infant" type="odom_republish_infant"/>
@@ -37,7 +34,7 @@
 	<node pkg="pose_estimation_walls" name="gyrodometry" type="gyrodometry">
 		<remap from="/odom" to="/tinypower/odom/republished"/>
 	</node>
-	<include file="$(find loam_velodyne)/launch/hector_loam_velodyne.launch"/>
+	<!-- <include file="$(find loam_velodyne)/launch/hector_loam_velodyne.launch"/> -->
 	<node pkg="pose_estimation_walls" name="odom_creater_for_loamvelodyne" type="odom_creater_for_loamvelodyne"/>
 	<node pkg="pose_estimation_walls" name="odom_creater_for_lsdslam" type="odom_creator_for_lsdslam">
 		<remap from="/odom" to="/tinypower/odom/republished"/>
