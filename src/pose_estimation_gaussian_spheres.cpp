@@ -71,7 +71,7 @@ class PoseEstimationGaussianSphere{
 		/*flags*/
 		bool first_callback_odom = true;
 		bool inipose_is_available = false;
-		const bool mode_no_d_gauss = false;
+		const bool mode_no_d_gauss = true;
 	public:
 		PoseEstimationGaussianSphere();
 		void CallbackPC(const sensor_msgs::PointCloud2ConstPtr &msg);
@@ -159,10 +159,10 @@ void PoseEstimationGaussianSphere::CallbackPC(const sensor_msgs::PointCloud2Cons
 	const size_t max_points_num = 800;
 	if(gaussian_sphere->points.size()>max_points_num){
 		/*simple*/
-		double sparse_step = gaussian_sphere->points.size()/(double)max_points_num;
-		pcl::PointCloud<pcl::PointXYZ>::Ptr tmp_cloud {new pcl::PointCloud<pcl::PointXYZ>};
-		for(double a=0.0;a<gaussian_sphere->points.size();a+=sparse_step)	tmp_cloud->points.push_back(gaussian_sphere->points[a]);
-		gaussian_sphere = tmp_cloud;
+		// double sparse_step = gaussian_sphere->points.size()/(double)max_points_num;
+		// pcl::PointCloud<pcl::PointXYZ>::Ptr tmp_cloud {new pcl::PointCloud<pcl::PointXYZ>};
+		// for(double a=0.0;a<gaussian_sphere->points.size();a+=sparse_step)	tmp_cloud->points.push_back(gaussian_sphere->points[a]);
+		// gaussian_sphere = tmp_cloud;
         //
 		// #<{(|multi threads|)}>#
 		// double sparse_step = gaussian_sphere->points.size()/(double)max_points_num;
@@ -463,7 +463,7 @@ bool PoseEstimationGaussianSphere::GVectorEstimation(void)
 	else if(gaussian_sphere_clustered->points.size()==1){
 		// std::cout << ">> 1 normal" << std::endl;
 		PartialRotation();
-		rpy_cov_pub.data[3] = 1.0e+1;
+		rpy_cov_pub.data[3] = 5.0e+0;
 	}
 	else if(gaussian_sphere_clustered->points.size()==2){
 		// std::cout << ">> 2 normals" << std::endl;
