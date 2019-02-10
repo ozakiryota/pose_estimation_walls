@@ -68,6 +68,7 @@ class PoseEstimationGaussianSphere{
 		ros::Time time_pub;
 		tf::Quaternion q_rp_correction;
 		tf::Quaternion q_y_correction;
+		std::vector<int> cases_counter;
 		/*flags*/
 		bool first_callback_odom = true;
 		bool inipose_is_available = false;
@@ -125,6 +126,7 @@ PoseEstimationGaussianSphere::PoseEstimationGaussianSphere()
 	g_vector_from_ekf.z = 0.0;
 	g_vector_walls = g_vector_from_ekf;
 	rpy_cov_pub.data.resize(4);
+	cases_counter = {0,0,0,0,0};
 }
 
 void PoseEstimationGaussianSphere::CallbackPC(const sensor_msgs::PointCloud2ConstPtr &msg)
@@ -132,7 +134,12 @@ void PoseEstimationGaussianSphere::CallbackPC(const sensor_msgs::PointCloud2Cons
 	// std::cout << "CALLBACK PC" << std::endl;
 	pcl::fromROSMsg(*msg, *cloud);
 	time_pub = msg->header.stamp;
-	if(inipose_is_available)	pcl::transformPointCloud(*cloud, *cloud, Eigen::Vector3f(0.0, 0.0, 0.0), lidar_alignment);
+	if(inipose_is_available){
+		pcl::transformPointCloud(*cloud, *cloud, Eigen::Vector3f(0.0, 0.0, 0.0), lidar_alignment);
+		cases_counter[4]++;
+		std::cout << "cases 0:" << cases_counter[0]/(double)cases_counter[4]*100.0 << "% 1:" << cases_counter[1]/(double)cases_counter[4]*100.0 << "% 2:" << cases_counter[2]/(double)cases_counter[4]*100.0 << "% 3:" << cases_counter[3]/(double)cases_counter[4]*100.0 << "%" << std::endl;
+		std::cout << "cases 0:" << cases_counter[0] << " 1:" << cases_counter[1] << "2:" << cases_counter[2] << " 3:" << cases_counter[3] << " 4:" << cases_counter[4] << std::endl;
+	}
 	ClearPoints();
 	kdtree.setInputCloud(cloud);
 	const int num_threads = std::thread::hardware_concurrency();
@@ -403,8 +410,8 @@ void PoseEstimationGaussianSphere::ClusterGauss(void)
 {
 	// std::cout << "POINT CLUSTER" << std::endl;
 	const double cluster_distance = 0.1;
-	// const int min_num_cluster_belongings = 70;
-	const int min_num_cluster_belongings = 40;
+	const int min_num_cluster_belongings = 70;
+	// const int min_num_cluster_belongings = 40;
 	pcl::search::KdTree<pcl::PointXYZ>::Ptr tree (new pcl::search::KdTree<pcl::PointXYZ>);
 	tree->setInputCloud(gaussian_sphere);
 	std::vector<pcl::PointIndices> cluster_indices;
@@ -458,12 +465,14 @@ bool PoseEstimationGaussianSphere::GVectorEstimation(void)
 	// std::cout << "G VECTOR ESTIMATION" << std::endl;
 	if(gaussian_sphere_clustered->points.size()==0){
 		// std::cout << ">> 0 normal" << std::endl;
+		if(inipose_is_available)	cases_counter[0]++;
 		return false;
 	}
 	else if(gaussian_sphere_clustered->points.size()==1){
 		// std::cout << ">> 1 normal" << std::endl;
 		PartialRotation();
 		rpy_cov_pub.data[3] = 5.0e+0;
+		if(inipose_is_available)	cases_counter[1]++;
 	}
 	else if(gaussian_sphere_clustered->points.size()==2){
 		// std::cout << ">> 2 normals" << std::endl;
@@ -472,6 +481,7 @@ bool PoseEstimationGaussianSphere::GVectorEstimation(void)
 		g_vector_walls.normal_y = gaussian_sphere_clustered->points[0].z*gaussian_sphere_clustered->points[1].x - gaussian_sphere_clustered->points[0].x*gaussian_sphere_clustered->points[1].z;
 		g_vector_walls.normal_z = gaussian_sphere_clustered->points[0].x*gaussian_sphere_clustered->points[1].y - gaussian_sphere_clustered->points[0].y*gaussian_sphere_clustered->points[1].x;
 		rpy_cov_pub.data[3] = 1.0e+0;
+		if(inipose_is_available)	cases_counter[2]++;
 	}
 	else if(gaussian_sphere_clustered->points.size()>2){
 		// std::cout << ">> more than 3 normals" << std::endl;
@@ -482,6 +492,7 @@ bool PoseEstimationGaussianSphere::GVectorEstimation(void)
 		g_vector_walls.normal_y = plane_parameters[1];
 		g_vector_walls.normal_z = plane_parameters[2];
 		rpy_cov_pub.data[3] = 1.0e+0;
+		if(inipose_is_available)	cases_counter[3]++;
 	}
 	/*flip*/
 	flipNormalTowardsViewpoint(g_vector_walls, 0.0, 0.0, -100.0, g_vector_walls.normal_x, g_vector_walls.normal_y, g_vector_walls.normal_z);
