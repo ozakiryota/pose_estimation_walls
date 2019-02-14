@@ -7,7 +7,7 @@
 	<!-- <node pkg="rosbag" type="play" name="player" args="&#45;&#45;clock /home/amsl/ozaki/bagfiles/tilting_wall/1largeplate45deg.bag &#45;s 30"/> -->
 	<!-- <node pkg="rosbag" type="play" name="player" args="&#45;&#45;clock /home/amsl/ozaki/bagfiles/tilting_wall/1smallplate30deg.bag &#45;s 30"/> -->
 	<!-- <node pkg="rosbag" type="play" name="player" args="&#45;&#45;clock /home/amsl/ozaki/bagfiles/tilting_wall/2largeplate30deg.bag &#45;s 30"/> -->
-	<node pkg="rosbag" type="play" name="player" args="--clock /home/amsl/ozaki/bagfiles/infant/2019-01-25-13-57-20.bag -u 40"/>
+	<node pkg="rosbag" type="play" name="player" args="--clock /home/amsl/ozaki/bagfiles/mocap/0126_infant/no_lsd/2019-01-26-15-41-30.bag -s 220"/>
 
 	<node pkg="rviz" type="rviz" name="rviz" args="-d /home/amsl/.rviz/velodyne.rviz"/>
 

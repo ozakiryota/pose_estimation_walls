@@ -13,6 +13,7 @@ class OdomPrinter{
 		ros::Subscriber sub_odom2;
 		ros::Subscriber sub_odom3;
 		ros::Subscriber sub_odom4;
+		ros::Subscriber sub_odom5;
 		/*objects*/
 		tf::TransformListener listener;
 		tf::Quaternion q_ini_pose = {0.0, 0.0, 0.0, 1.0};
@@ -23,6 +24,7 @@ class OdomPrinter{
 		void CallbackOdom2(const nav_msgs::OdometryConstPtr& msg);
 		void CallbackOdom3(const nav_msgs::OdometryConstPtr& msg);
 		void CallbackOdom4(const nav_msgs::OdometryConstPtr& msg);
+		void CallbackOdom5(const nav_msgs::OdometryConstPtr& msg);
 		void Print(nav_msgs::Odometry odom);
 };
 
@@ -33,6 +35,7 @@ OdomPrinter::OdomPrinter()
 	sub_odom2 = nh.subscribe("/gyrodometry", 1, &OdomPrinter::CallbackOdom2, this);
 	sub_odom3 = nh.subscribe("/loamvelodyne_odometry", 1, &OdomPrinter::CallbackOdom3, this);
 	sub_odom4 = nh.subscribe("/lsdslam_odometry", 1, &OdomPrinter::CallbackOdom4, this);
+	sub_odom5 = nh.subscribe("/ndt_odometry", 1, &OdomPrinter::CallbackOdom5, this);
 }
 
 void OdomPrinter::CallbackInipose(const geometry_msgs::QuaternionConstPtr& msg)
@@ -56,6 +59,11 @@ void OdomPrinter::CallbackOdom3(const nav_msgs::OdometryConstPtr& msg)
 }
 
 void OdomPrinter::CallbackOdom4(const nav_msgs::OdometryConstPtr& msg)
+{
+	Print(*msg);
+}
+
+void OdomPrinter::CallbackOdom5(const nav_msgs::OdometryConstPtr& msg)
 {
 	Print(*msg);
 }
