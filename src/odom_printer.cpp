@@ -35,7 +35,7 @@ OdomPrinter::OdomPrinter()
 	sub_odom2 = nh.subscribe("/gyrodometry", 1, &OdomPrinter::CallbackOdom2, this);
 	sub_odom3 = nh.subscribe("/loamvelodyne_odometry", 1, &OdomPrinter::CallbackOdom3, this);
 	sub_odom4 = nh.subscribe("/lsdslam_odometry", 1, &OdomPrinter::CallbackOdom4, this);
-	sub_odom5 = nh.subscribe("/ndt_odometry", 1, &OdomPrinter::CallbackOdom5, this);
+	sub_odom5 = nh.subscribe("/imu_odometry", 1, &OdomPrinter::CallbackOdom5, this);
 }
 
 void OdomPrinter::CallbackInipose(const geometry_msgs::QuaternionConstPtr& msg)

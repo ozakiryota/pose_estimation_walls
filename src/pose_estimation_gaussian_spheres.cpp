@@ -410,8 +410,8 @@ void PoseEstimationGaussianSphere::ClusterGauss(void)
 {
 	// std::cout << "POINT CLUSTER" << std::endl;
 	const double cluster_distance = 0.1;
-	const int min_num_cluster_belongings = 70;
-	// const int min_num_cluster_belongings = 40;
+	// const int min_num_cluster_belongings = 70;
+	const int min_num_cluster_belongings = 40;
 	pcl::search::KdTree<pcl::PointXYZ>::Ptr tree (new pcl::search::KdTree<pcl::PointXYZ>);
 	tree->setInputCloud(gaussian_sphere);
 	std::vector<pcl::PointIndices> cluster_indices;
