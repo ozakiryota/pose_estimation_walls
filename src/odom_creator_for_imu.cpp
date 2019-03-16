@@ -21,15 +21,17 @@ class OdomCreatorForIMU{
 		nav_msgs::Odometry odom3d_last;
 		/*objects*/
 		tf::Quaternion q_pose = {0.0, 0.0, 0.0, 1.0};
-		tf::Quaternion q_slam_now;
-		tf::Quaternion q_slam_last;
+		// tf::Quaternion q_imu_now;
+		// tf::Quaternion q_imu_last;
+		tf::Quaternion q_ini_yaw;
 		/*flags*/
 		bool first_callback_odom = true;
+		bool first_callback_imu = true;
 		bool inipose_is_available = false;
 	public:
 		OdomCreatorForIMU();
 		void InitializeOdom(nav_msgs::Odometry& odom);
-		void CallbackIniPose(const geometry_msgs::QuaternionConstPtr& msg);
+		// void CallbackIniPose(const geometry_msgs::QuaternionConstPtr& msg);
 		void CallbackOdom(const nav_msgs::OdometryConstPtr& msg);
 		void CallbackIMU(const sensor_msgs::ImuConstPtr& msg);
 		void Publisher(void);
@@ -37,7 +39,7 @@ class OdomCreatorForIMU{
 
 OdomCreatorForIMU::OdomCreatorForIMU()
 {
-	sub_inipose = nh.subscribe("/initial_pose", 1, &OdomCreatorForIMU::CallbackIniPose, this);
+	// sub_inipose = nh.subscribe("/initial_pose", 1, &OdomCreatorForIMU::CallbackIniPose, this);
 	sub_odom = nh.subscribe("/odom", 1, &OdomCreatorForIMU::CallbackOdom, this);
 	sub_imu = nh.subscribe("/imu/data", 1, &OdomCreatorForIMU::CallbackIMU, this);
 	pub = nh.advertise<nav_msgs::Odometry>("/imu_odometry", 1);
@@ -58,13 +60,13 @@ void OdomCreatorForIMU::InitializeOdom(nav_msgs::Odometry& odom)
 	odom.pose.pose.orientation.w = 1.0;
 }
 
-void OdomCreatorForIMU::CallbackIniPose(const geometry_msgs::QuaternionConstPtr& msg)
-{
-	if(!inipose_is_available){
-		quaternionMsgToTF(*msg, q_pose);
-		inipose_is_available = true;
-	}   
-}
+// void OdomCreatorForIMU::CallbackIniPose(const geometry_msgs::QuaternionConstPtr& msg)
+// {
+// 	if(!inipose_is_available){
+// 		quaternionMsgToTF(*msg, q_pose);
+// 		inipose_is_available = true;
+// 	}   
+// }
 
 void OdomCreatorForIMU::CallbackOdom(const nav_msgs::OdometryConstPtr& msg)
 {
@@ -75,10 +77,10 @@ void OdomCreatorForIMU::CallbackOdom(const nav_msgs::OdometryConstPtr& msg)
 		quaternionMsgToTF(odom2d_last.pose.pose.orientation, q_pose_odom2d_last);
 		quaternionMsgToTF(odom3d_last.pose.pose.orientation, q_pose_odom3d_last);
 		tf::Quaternion q_global_move2d = tf::Quaternion(
-				odom2d_now.pose.pose.position.x - odom2d_last.pose.pose.position.x,
-				odom2d_now.pose.pose.position.y - odom2d_last.pose.pose.position.y,
-				odom2d_now.pose.pose.position.z - odom2d_last.pose.pose.position.z,
-				0.0);
+			odom2d_now.pose.pose.position.x - odom2d_last.pose.pose.position.x,
+			odom2d_now.pose.pose.position.y - odom2d_last.pose.pose.position.y,
+			odom2d_now.pose.pose.position.z - odom2d_last.pose.pose.position.z,
+			0.0);
 		tf::Quaternion q_local_move2d = q_pose_odom2d_last.inverse()*q_global_move2d*q_pose_odom2d_last;
 		tf::Quaternion q_global_move3d = q_pose_odom3d_last*q_local_move2d*q_pose_odom3d_last.inverse();
 
@@ -96,17 +98,27 @@ void OdomCreatorForIMU::CallbackOdom(const nav_msgs::OdometryConstPtr& msg)
 
 void OdomCreatorForIMU::CallbackIMU(const sensor_msgs::ImuConstPtr& msg)
 {
-	quaternionMsgToTF(msg->orientation, q_slam_now);
-	
-	if(inipose_is_available){
-		tf::Quaternion q_relative_rotation = q_slam_last.inverse()*q_slam_now;
-		q_relative_rotation.normalize();
-		q_pose = q_pose*q_relative_rotation;
-		q_pose.normalize();
-		quaternionTFToMsg(q_pose, odom3d_now.pose.pose.orientation);
+	tf::Quaternion q_imu_now;
+	quaternionMsgToTF(msg->orientation, q_imu_now);
+	if(first_callback_imu){
+		double r, p, y;
+		tf::Matrix3x3(q_imu_now).getRPY(r, p, y);
+		q_ini_yaw = tf::createQuaternionFromRPY(0, 0, y);
+		first_callback_imu = false;
 	}
+	else	q_pose = q_ini_yaw.inverse()*q_imu_now;
+	quaternionTFToMsg(q_pose, odom3d_now.pose.pose.orientation);
+
 	
-	q_slam_last = q_slam_now;
+	// if(inipose_is_available){
+	// 	tf::Quaternion q_relative_rotation = q_imu_last.inverse()*q_imu_now;
+	// 	q_relative_rotation.normalize();
+	// 	q_pose = q_pose*q_relative_rotation;
+	// 	q_pose.normalize();
+	// 	quaternionTFToMsg(q_pose, odom3d_now.pose.pose.orientation);
+	// }
+	
+	// q_imu_last = q_imu_now;
 }
 
 void OdomCreatorForIMU::Publisher(void)

@@ -121,7 +121,8 @@ PoseEstimationGaussianSphere::PoseEstimationGaussianSphere()
 	pub_pose = nh.advertise<geometry_msgs::PoseStamped>("/pose_dgauss", 1);
 	viewer.setBackgroundColor(1, 1, 1);
 	viewer.addCoordinateSystem(0.8, "axis");
-	viewer.setCameraPosition(0.0, 0.0, 50.0, 0.0, 0.0, 0.0);
+	// viewer.setCameraPosition(0.0, 0.0, 50.0, 0.0, 0.0, 0.0);
+	viewer.setCameraPosition(-30.0, 0.0, 10.0, 0.0, 0.0, 1.0);
 	g_vector_from_ekf.x = 0.0;
 	g_vector_from_ekf.y = 0.0;
 	g_vector_from_ekf.z = 0.0;
@@ -134,6 +135,7 @@ void PoseEstimationGaussianSphere::CallbackPC(const sensor_msgs::PointCloud2Cons
 {
 	// std::cout << "CALLBACK PC" << std::endl;
 	pcl::fromROSMsg(*msg, *cloud);
+	std::cout << "number of points in 1 scan = " << cloud->points.size() << std::endl;
 	time_pub = msg->header.stamp;
 	if(inipose_is_available){
 		pcl::transformPointCloud(*cloud, *cloud, Eigen::Vector3f(0.0, 0.0, 0.0), lidar_alignment);
@@ -163,16 +165,16 @@ void PoseEstimationGaussianSphere::CallbackPC(const sensor_msgs::PointCloud2Cons
 	
 	/*test*/
 	std::cout << "gaussian_sphere->points.size() = " << gaussian_sphere->points.size() << std::endl;
-	const size_t max_points_num = 800;
-	if(gaussian_sphere->points.size()>max_points_num){
-		// #<{(|simple|)}>#
-		// double sparse_step = gaussian_sphere->points.size()/(double)max_points_num;
-		// pcl::PointCloud<pcl::PointXYZ>::Ptr tmp_cloud {new pcl::PointCloud<pcl::PointXYZ>};
-		// for(double a=0.0;a<gaussian_sphere->points.size();a+=sparse_step)	tmp_cloud->points.push_back(gaussian_sphere->points[a]);
-		// gaussian_sphere = tmp_cloud;
-        //
+	const size_t max_num_points = 800;
+	if(gaussian_sphere->points.size()>max_num_points){
+		/*simple*/
+		double sparse_step = gaussian_sphere->points.size()/(double)max_num_points;
+		pcl::PointCloud<pcl::PointXYZ>::Ptr tmp_cloud {new pcl::PointCloud<pcl::PointXYZ>};
+		for(double a=0.0;a<gaussian_sphere->points.size();a+=sparse_step)	tmp_cloud->points.push_back(gaussian_sphere->points[a]);
+		gaussian_sphere = tmp_cloud;
+
 		// #<{(|multi threads|)}>#
-		// double sparse_step = gaussian_sphere->points.size()/(double)max_points_num;
+		// double sparse_step = gaussian_sphere->points.size()/(double)max_num_points;
 		// class DecimatingPoints{
 		// 	private:
 		// 	public:
@@ -412,6 +414,7 @@ void PoseEstimationGaussianSphere::ClusterGauss(void)
 	const double cluster_distance = 0.1;
 	// const int min_num_cluster_belongings = 70;
 	const int min_num_cluster_belongings = 40;
+	// const int min_num_cluster_belongings = 20;
 	pcl::search::KdTree<pcl::PointXYZ>::Ptr tree (new pcl::search::KdTree<pcl::PointXYZ>);
 	tree->setInputCloud(gaussian_sphere);
 	std::vector<pcl::PointIndices> cluster_indices;
@@ -477,19 +480,21 @@ bool PoseEstimationGaussianSphere::GVectorEstimation(void)
 	}
 	else if(gaussian_sphere_clustered->points.size()==2){
 		// std::cout << ">> 2 normals" << std::endl;
-		// #<{(|judge|)}>#
-		// const double threshold_angle = 20.0;	//[deg]
-		// if(fabs(AngleBetweenVectors(gaussian_sphere_clustered_n->points[0], gaussian_sphere_clustered_n->points[1]))<threshold_angle/180.0*M_PI){
-		// 	std::cout << "AngleBetweenVectors " << AngleBetweenVectors(gaussian_sphere_clustered_n->points[0], gaussian_sphere_clustered_n->points[1])/M_PI*180.0 << " > threshold_angle[deg]" << std::endl;
-		// 	if(inipose_is_available)	cases_counter[4]++;
-		// 	return false;
-		// }
+		/*judge*/
+		const double threshold_angle = 20.0;	//[deg]
+		if(fabs(AngleBetweenVectors(gaussian_sphere_clustered_n->points[0], gaussian_sphere_clustered_n->points[1]))<threshold_angle/180.0*M_PI){
+			std::cout << "AngleBetweenVectors " << AngleBetweenVectors(gaussian_sphere_clustered_n->points[0], gaussian_sphere_clustered_n->points[1])/M_PI*180.0 << " > threshold_angle[deg]" << std::endl;
+			if(inipose_is_available)	cases_counter[4]++;
+			return false;
+		}
 		std::cout << "AngleBetweenVectors " << AngleBetweenVectors(gaussian_sphere_clustered_n->points[0], gaussian_sphere_clustered_n->points[1])/M_PI*180.0 << " [deg]" << std::endl;
 		/*cross product*/
 		g_vector_walls.normal_x = gaussian_sphere_clustered->points[0].y*gaussian_sphere_clustered->points[1].z - gaussian_sphere_clustered->points[0].z*gaussian_sphere_clustered->points[1].y;
 		g_vector_walls.normal_y = gaussian_sphere_clustered->points[0].z*gaussian_sphere_clustered->points[1].x - gaussian_sphere_clustered->points[0].x*gaussian_sphere_clustered->points[1].z;
 		g_vector_walls.normal_z = gaussian_sphere_clustered->points[0].x*gaussian_sphere_clustered->points[1].y - gaussian_sphere_clustered->points[0].y*gaussian_sphere_clustered->points[1].x;
 		rpy_cov_pub.data[3] = 1.0e+0;
+		// rpy_cov_pub.data[3] = 1.0e+1;
+		// rpy_cov_pub.data[3] = 1.0e-1;
 		// rpy_cov_pub.data[3] = ComputeLikelihood();
 		if(inipose_is_available)	cases_counter[2]++;
 	}
@@ -502,14 +507,16 @@ bool PoseEstimationGaussianSphere::GVectorEstimation(void)
 		g_vector_walls.normal_y = plane_parameters[1];
 		g_vector_walls.normal_z = plane_parameters[2];
 		rpy_cov_pub.data[3] = 1.0e+0;
+		// rpy_cov_pub.data[3] = 1.0e+1;
+		// rpy_cov_pub.data[3] = 1.0e-1;
 		// rpy_cov_pub.data[3] = ComputeLikelihood();
 		if(inipose_is_available)	cases_counter[3]++;
 	}
 	/*flip*/
 	flipNormalTowardsViewpoint(g_vector_walls, 0.0, 0.0, -100.0, g_vector_walls.normal_x, g_vector_walls.normal_y, g_vector_walls.normal_z);
 	/*if angle variation is too large, estimation would be wrong*/
-	const double threshold_angle_variation = 30.0;	//[deg]
-	// const double threshold_angle_variation = 8.0;	//[deg]
+	// const double threshold_angle_variation = 30.0;	//[deg]
+	const double threshold_angle_variation = 5.0;	//[deg]
 	if(fabs(AngleBetweenVectors(g_vector_walls, g_vector_from_ekf))>threshold_angle_variation/180.0*M_PI){
 		std::cout << ">> angle variation of g in 1 step is too large and would be wrong " << std::endl;
 		if(inipose_is_available)	cases_counter[4]++;

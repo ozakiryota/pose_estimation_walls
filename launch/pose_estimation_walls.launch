@@ -3,7 +3,8 @@
 	<param name="use_sim_time" value="true"/>
 
 	<!-- rosbag -->
-	<node pkg="rosbag" type="play" name="player" args="--clock /home/amsl/ozaki/bagfiles/velodyne_realsense/2018-10-06-12-14-59.bag -s 110"/>
+	<!-- <node pkg="rosbag" type="play" name="player" args="&#45;&#45;clock /home/amsl/ozaki/bagfiles/velodyne_realsense/2018&#45;10&#45;06&#45;12&#45;14&#45;59.bag &#45;s 110"/> -->
+	<node pkg="rosbag" type="play" name="player" args="--clock /home/amsl/ozaki/bagfiles/velodyne_realsense/2018-10-06-12-14-59.bag -s 60"/>
 	<!-- <node pkg="rosbag" type="play" name="player" args="&#45;&#45;clock /home/amsl/ozaki/bagfiles/velodyne_realsense/2018&#45;10&#45;06&#45;12&#45;14&#45;59.bag &#45;s 110 &#45;r 0.5"/> -->
 
 	<!-- rviz -->
@@ -28,6 +29,7 @@
 	<include file="$(find loam_velodyne)/launch/hector_loam_velodyne.launch"/>
 	<node pkg="pose_estimation_walls" name="odom_creater_for_loamvelodyne" type="odom_creater_for_loamvelodyne"/>
 	<node pkg="pose_estimation_walls" name="odom_creator_for_lsdslam" type="odom_creator_for_lsdslam"/>
+	<node pkg="pose_estimation_walls" name="odom_creater_for_imu" type="odom_creator_for_imu"/>
 
 	<!-- graph -->
 	<!-- <node pkg="pose_estimation_walls" name="graph_rpy" type="graph_rpy.py"/> -->

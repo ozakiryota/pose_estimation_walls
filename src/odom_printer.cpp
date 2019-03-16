@@ -1,6 +1,5 @@
 #include <ros/ros.h>
 #include <tf/tf.h>
-#include <tf/transform_listener.h>
 #include <nav_msgs/Odometry.h>
 
 class OdomPrinter{
@@ -15,7 +14,6 @@ class OdomPrinter{
 		ros::Subscriber sub_odom4;
 		ros::Subscriber sub_odom5;
 		/*objects*/
-		tf::TransformListener listener;
 		tf::Quaternion q_ini_pose = {0.0, 0.0, 0.0, 1.0};
 	public:
 		OdomPrinter();
