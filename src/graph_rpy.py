@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 
 import rospy
-from geometry_msgs.msg import PoseStamped
+from nav_msgs.msg import Odometry
 import tf
 import numpy as np
 import matplotlib.pyplot as plt
@@ -20,8 +20,7 @@ def callback(msg):
     global roll_
     global pitch_
     
-    e = tf.transformations.euler_from_quaternion((msg.pose.orientation.x, msg.pose.orientation.y, msg.pose.orientation.z, msg.pose.orientation.w))
-    # return Vector3(x=e[0], y=e[1], z=e[2])
+    e = tf.transformations.euler_from_quaternion((msg.pose.pose.orientation.x, msg.pose.pose.orientation.y, msg.pose.pose.orientation.z, msg.pose.pose.orientation.w))
 
     if start_time>0:
         t_ = time.time() - start_time
@@ -31,7 +30,7 @@ def callback(msg):
 def graph():
     print('graph_rpy')
     rospy.init_node('graph_rpy', anonymous=True)
-    rospy.Subscriber("/pose_ekf", PoseStamped, callback)
+    rospy.Subscriber("/imu_odometry", Odometry, callback)
     
     t = [0 for i in range(50)]
     roll = [0 for j in range(50)]
@@ -42,19 +41,19 @@ def graph():
 
     ### roll ###
     plt.subplot(2, 1, 1)
-    plt.title("roll")
+    # plt.title("roll")
     plt.xlabel("time[s]")
     plt.ylabel("roll[deg]")
-    plt.ylim(-10, 10)
+    plt.ylim(-5, 5)
     plt.grid(True)
     li_r, = plt.plot(t, roll)
 
     ### pitch ###
     plt.subplot(2, 1, 2)
-    plt.title("pitch")
+    # plt.title("pitch")
     plt.xlabel("time[s]")
     plt.ylabel("pitch[deg]")
-    plt.ylim(-10, 10)
+    plt.ylim(-5, 5)
     plt.grid(True)
     li_p, = plt.plot(t, pitch)
     
@@ -89,7 +88,7 @@ def graph():
         plt.xlim(min(t), max(t))
 
         plt.draw()
-        plt.pause(0.01)
+        plt.pause(0.1)
     rospy.spin()
 
 if __name__ == '__main__':

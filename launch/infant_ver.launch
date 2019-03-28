@@ -3,13 +3,13 @@
 	<param name="use_sim_time" value="true"/>
 
 	<!-- rosbag -->
-	<node pkg="rosbag" type="play" name="player" args="--clock /home/amsl/ozaki/bagfiles/library_road/2019-03-16-17-01-53.bag -s 30 -r 3"/>
+	<node pkg="rosbag" type="play" name="player" args="--clock /home/amsl/ozaki/bagfiles/library_road/2019-03-16-17-01-53.bag -s 20"/>
 
 	<!-- rviz -->
 	<!-- <node pkg="rviz" type="rviz" name="rviz_startpoint" args="&#45;d /home/amsl/.rviz/trajectories_startpoint.rviz"/> -->
 	<!-- <node pkg="rviz" type="rviz" name="rviz_skyview" args="&#45;d /home/amsl/.rviz/trajectories_skyview.rviz"/> -->
 	<node pkg="rviz" type="rviz" name="rviz_xz" args="-d /home/amsl/.rviz/trajectories_xz.rviz"/>
-	<node pkg="rviz" type="rviz" name="rviz_xy" args="-d /home/amsl/.rviz/trajectories_xy.rviz"/>
+	<!-- <node pkg="rviz" type="rviz" name="rviz_xy" args="&#45;d /home/amsl/.rviz/trajectories_xy.rviz"/> -->
 
 	<!-- sensor driver -->
 	<include file="$(find velodyne_pointcloud)/launch/32e_points.launch"/>
@@ -43,5 +43,6 @@
 	</node>
 
 	<!-- graph -->
-	<!-- <node pkg="pose_estimation_walls" name="graph_rpy" type="graph_rpy.py"/> -->
+	<node pkg="pose_estimation_walls" name="graph_rpy" type="graph_rpy.py"/>
+	<node pkg="pose_estimation_walls" name="graph_odom" type="graph_odom.py"/>
 </launch>
