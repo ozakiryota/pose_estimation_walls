@@ -80,6 +80,7 @@ void CombineLinearVelocityAndPose::CallbackOdom(const nav_msgs::OdometryConstPtr
 void CombineLinearVelocityAndPose::CallbackPose(const geometry_msgs::PoseStampedConstPtr& msg)
 {
 	odom3d_now.pose.pose.orientation = msg->pose.orientation;
+	Publisher();
 }
 
 Eigen::MatrixXd CombineLinearVelocityAndPose::FrameRotation(geometry_msgs::Quaternion q, Eigen::MatrixXd X, bool from_global_to_local)
