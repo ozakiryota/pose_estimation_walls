@@ -3,7 +3,8 @@
 	<param name="use_sim_time" value="true"/>
 
 	<!-- rosbag -->
-	<node pkg="rosbag" type="play" name="player" args="--clock /home/amsl/ozaki/bagfiles/library_road/2019-03-16-17-01-53.bag -s 20"/>
+	<node pkg="rosbag" type="play" name="player" args="--clock /home/amsl/ozaki/bagfiles/mocap/0119_infant/2019-01-19-18-26-15.bag -s 60"/>
+	<!-- <node pkg="rosbag" type="play" name="player" args="&#45;&#45;clock /home/amsl/ozaki/bagfiles/library_road/2019&#45;03&#45;16&#45;17&#45;01&#45;53.bag &#45;s 20"/> -->
 
 	<!-- rviz -->
 	<!-- <node pkg="rviz" type="rviz" name="rviz_startpoint" args="&#45;d /home/amsl/.rviz/trajectories_startpoint.rviz"/> -->
@@ -21,13 +22,13 @@
 	<!-- proposed method -->
 	<node pkg="pose_estimation_walls" name="odom_republish_infant" type="odom_republish_infant"/>
 	<node pkg="pose_estimation_walls" name="imu_initial_alignment" type="imu_initial_alignment" output="screen"/>
-	<!-- <node pkg="pose_estimation_walls" name="ekf_pose" type="ekf_pose" output="screen"/> -->
-	<!-- <node pkg="pose_estimation_walls" name="pose_estimation_gaussian_spheres" type="pose_estimation_gaussian_spheres" output="screen"> -->
-	<!-- 	<remap from="/odom" to="/tinypower/odom/republished"/> -->
-	<!-- </node> -->
-	<!-- <node pkg="pose_estimation_walls" name="combine_linearvelocity_and_pose" type="combine_linearvelocity_and_pose"> -->
-	<!-- 	<remap from="/odom" to="/tinypower/odom/republished"/> -->
-	<!-- </node> -->
+	<node pkg="pose_estimation_walls" name="ekf_pose" type="ekf_pose" output="screen"/>
+	<node pkg="pose_estimation_walls" name="pose_estimation_gaussian_spheres" type="pose_estimation_gaussian_spheres" output="screen">
+		<remap from="/odom" to="/tinypower/odom/republished"/>
+	</node>
+	<node pkg="pose_estimation_walls" name="combine_linearvelocity_and_pose" type="combine_linearvelocity_and_pose">
+		<remap from="/odom" to="/tinypower/odom/republished"/>
+	</node>
 
 	<!-- comparisons	 -->
 	<node pkg="pose_estimation_walls" name="gyrodometry" type="gyrodometry">
@@ -43,6 +44,6 @@
 	</node>
 
 	<!-- graph -->
-	<node pkg="pose_estimation_walls" name="graph_rpy" type="graph_rpy.py"/>
-	<node pkg="pose_estimation_walls" name="graph_odom" type="graph_odom.py"/>
+	<!-- <node pkg="pose_estimation_walls" name="graph_rpy" type="graph_rpy.py"/> -->
+	<!-- <node pkg="pose_estimation_walls" name="graph_odom" type="graph_odom.py"/> -->
 </launch>
