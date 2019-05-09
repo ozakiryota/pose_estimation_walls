@@ -69,6 +69,7 @@ void ImuInitialAlignment::Callback(const sensor_msgs::ImuConstPtr& msg)
 		if(imu_is_moving || time>timelimit){
 			initial_algnment_is_done = true;
 			tf::Quaternion q = tf::createQuaternionFromRPY(X(0, 0), X(1, 0), 0.0);
+			q = tf::createQuaternionFromRPY(0, 0, 0);	//test
 			quaternionTFToMsg(q, initial_pose);
 			if(time>timelimit)	std::cout << "time > " << timelimit << "[s]" << std::endl;
 			else	std::cout << "Moved at " << time << "[s]" << std::endl;
