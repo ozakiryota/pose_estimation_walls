@@ -259,6 +259,7 @@ void PoseEstimationGaussianSphere::CallbackInipose(const geometry_msgs::Quaterni
 		std::cout << "p_calibration = " << p_calibration << std::endl;
 		tf::Quaternion q_calibration = tf::createQuaternionFromRPY(r_calibration, p_calibration, 0.0)*q_inipose.inverse();
 		lidar_alignment = Eigen::Quaternionf(q_calibration.w(), q_calibration.x(), q_calibration.y(), q_calibration.z());
+		std::cout << "lidar_alignment = (" << lidar_alignment.x() << ", " << lidar_alignment.y() << ", " << lidar_alignment.z() << ", " << lidar_alignment.w() << ")"<< std::endl;
 	}
 }
 
